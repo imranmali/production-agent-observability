@@ -1,0 +1,135 @@
+# Local production-like stack.
+#
+#   client -> traefik (weighted stable/canary) -> agent-stable / agent-canary
+#   agents --OTLP--> otel-collector --> phoenix (+ LangSmith / Arize overlays)
+#   prometheus <- scrape agents, traefik, collector; rules -> alertmanager -> alert-sink
+#   grafana <- prometheus
+#
+# Release config for each track lives in deploy/state/{stable,canary}.env and the
+# traffic split in deploy/state/traefik/weights.yml; `make up` seeds both and the
+# canary controller (canary/controller.py) rewrites them.
+
+x-agent: &agent
+  image: support-agent:${IMAGE_TAG:-local}
+  build: .
+  restart: unless-stopped
+  environment: &agent-env
+    LLM_PROVIDER: ${LLM_PROVIDER:-simulated}
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    PROJECT_NAME: ${PROJECT_NAME:-production-agent}
+    ENVIRONMENT: local
+    TRACE_CAPTURE_CONTENT: ${TRACE_CAPTURE_CONTENT:-true}
+  depends_on: [otel-collector]
+
+services:
+  agent-stable:
+    <<: *agent
+    env_file: [deploy/state/stable.env]
+    environment:
+      <<: *agent-env
+      DEPLOYMENT_TRACK: stable
+
+  agent-canary:
+    <<: *agent
+    env_file: [deploy/state/canary.env]
+    environment:
+      <<: *agent-env
+      DEPLOYMENT_TRACK: canary
+
+  traefik:
+    image: traefik:v3.5
+    command:
+      - --entrypoints.web.address=:8080
+      - --entrypoints.metrics.address=:8082
+      - --metrics.prometheus=true
+      - --metrics.prometheus.entrypoint=metrics
+      - --metrics.prometheus.addServicesLabels=true
+      - --metrics.prometheus.addRoutersLabels=true
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --entrypoints.traefik.address=:8090
+      - --log.level=INFO
+    ports:
+      - "8080:8080"   # agent API
+      - "8090:8090"   # traefik dashboard
+    volumes:
+      - ./deploy/state/traefik:/etc/traefik/dynamic:ro
+    depends_on: [agent-stable, agent-canary]
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.130.0
+    command:
+      - --config=/etc/otelcol/config.yaml
+      - --config=/etc/otelcol/${OTEL_OVERLAY:-overlay.none.yaml}
+    environment:
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_PROJECT: ${PROJECT_NAME:-production-agent}
+      LANGSMITH_OTLP_ENDPOINT: ${LANGSMITH_OTLP_ENDPOINT:-https://api.smith.langchain.com/otel}
+      ARIZE_SPACE_ID: ${ARIZE_SPACE_ID:-}
+      ARIZE_API_KEY: ${ARIZE_API_KEY:-}
+      TRACE_SAMPLE_PERCENT: ${TRACE_SAMPLE_PERCENT:-100}
+    volumes:
+      - ./deploy/otel-collector:/etc/otelcol:ro
+    ports:
+      - "4318:4318"
+    depends_on: [phoenix]
+
+  phoenix:
+    image: arizephoenix/phoenix:version-11.0.0
+    environment:
+      PHOENIX_WORKING_DIR: /data
+    volumes:
+      - phoenix-data:/data
+    ports:
+      - "6006:6006"
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./deploy/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    command: [--config.file=/etc/alertmanager/alertmanager.yml]
+    volumes:
+      - ./deploy/alertmanager:/etc/alertmanager:ro
+    ports:
+      - "9093:9093"
+
+  alert-sink:
+    image: python:3.12-slim
+    command: [python, -u, /app/alert_sink.py]
+    volumes:
+      - ./deploy/alert-sink:/app:ro
+    ports:
+      - "9095:9095"
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/agent-overview.json
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
+
+volumes:
+  phoenix-data:
+  prometheus-data:
+  grafana-data:

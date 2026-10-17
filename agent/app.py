@@ -58,7 +58,9 @@ async def lifespan(app: FastAPI):
     provider.shutdown()
 
 
-app = FastAPI(title="Support agent", lifespan=lifespan)
+# FastAPI's native HTTP spans are off: `agent.run` is the root span, which is what
+# Phoenix/LangSmith/Arize list as a trace. HTTP-level RED metrics come from Traefik.
+app = FastAPI(title="Support agent", lifespan=lifespan, telemetry={"tracing": False, "metrics": False})
 
 
 @app.post("/v1/chat")

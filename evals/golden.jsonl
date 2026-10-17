@@ -1,0 +1,20 @@
+{"id": "order-shipped", "message": "Where is my order 10232?", "expect_tools": ["get_order"], "expect_contains": ["shipped"], "max_steps": 3}
+{"id": "order-processing", "message": "What's the status of order #10233?", "expect_tools": ["get_order"], "expect_contains": ["processing"], "max_steps": 3}
+{"id": "order-delivered", "message": "Has order 10231 arrived yet?", "expect_tools": ["get_order"], "expect_contains": ["delivered"], "max_steps": 3}
+{"id": "order-cancelled", "message": "I think I cancelled order 10235, can you confirm?", "expect_tools": ["get_order"], "expect_contains": ["cancel"], "max_steps": 3}
+{"id": "order-missing", "message": "Where is order 99999?", "expect_tools": ["get_order"], "expect_contains": ["99999"], "max_steps": 3}
+{"id": "policy-returns", "message": "What is your return policy?", "expect_tools": ["search_kb"], "expect_contains": ["30 days|30-day|thirty days"], "max_steps": 3}
+{"id": "policy-refund-time", "message": "How long does a refund take?", "expect_tools": ["search_kb"], "expect_contains": ["5 business days|five business days|5 working days"], "max_steps": 3}
+{"id": "policy-shipping", "message": "How much does shipping cost?", "expect_tools": ["search_kb"], "expect_contains": ["4.95"], "max_steps": 3}
+{"id": "policy-warranty", "message": "My headphones are defective, is there a warranty?", "expect_tools": ["search_kb"], "expect_contains": ["2-year|two-year|2 year|two year"], "max_steps": 3}
+{"id": "policy-payment", "message": "Can I pay by invoice?", "expect_tools": ["search_kb"], "expect_contains": ["14 days|14-day|fourteen days"], "max_steps": 3}
+{"id": "policy-price-match", "message": "I found it cheaper elsewhere, do you price match?", "expect_tools": ["search_kb"], "expect_contains": ["store credit"], "max_steps": 3}
+{"id": "return-order", "message": "Can I return order 10231?", "expect_tools": ["get_order", "search_kb"], "expect_contains": ["30 days|30-day|thirty days"], "max_steps": 4}
+{"id": "cancel-order", "message": "Please cancel order 10233", "expect_tools": ["get_order", "search_kb"], "expect_contains": ["processing"], "max_steps": 4}
+{"id": "final-sale", "message": "I want to return order 10234", "expect_tools": ["get_order", "search_kb"], "expect_contains": ["final"], "max_steps": 4}
+{"id": "refund-math", "message": "I return order 10231. What refund do I get after the label fee, 179 - 5.95?", "expect_tools": ["get_order", "calculate"], "expect_contains": ["173.05"], "max_steps": 5}
+{"id": "total-math", "message": "What is 289 + 12 for my monitor and cable?", "expect_tools": ["calculate"], "expect_contains": ["301"], "max_steps": 3}
+{"id": "escalate", "message": "I want to speak to a human about a complaint", "expect_tools": ["create_ticket"], "expect_contains": ["ticket"], "max_steps": 3}
+{"id": "escalate-order", "message": "Order 10232 is late, I want to escalate this to a manager", "expect_tools": ["get_order", "create_ticket"], "expect_contains": ["ticket"], "max_steps": 4}
+{"id": "smalltalk", "message": "Hi there!", "expect_tools": [], "expect_contains": [], "max_steps": 2}
+{"id": "vague", "message": "I have a problem", "expect_tools": [], "expect_contains": [], "max_steps": 3}

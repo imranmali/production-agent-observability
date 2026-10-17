@@ -20,7 +20,9 @@ class Settings(BaseSettings):
     # Identity: shows up on every metric, span and log line.
     service_name: str = "support-agent"
     release: str = Field("dev", description="Release name, e.g. v1.4.0")
-    deployment_track: Literal["stable", "canary", "dev"] = "dev"
+    # stable | canary under docker compose; on Kubernetes Argo Rollouts tells the
+    # tracks apart by pod-template hash instead (see deploy/k8s/servicemonitor.yaml).
+    deployment_track: str = "dev"
     environment: str = "local"
 
     # Model provider.
@@ -51,14 +53,15 @@ class Settings(BaseSettings):
     sim_verbosity: float = 1.0
 
     # Telemetry.
+    project_name: str = "production-agent"  # Phoenix / Arize / LangSmith project
     otel_exporter_otlp_endpoint: str | None = None  # e.g. http://otel-collector:4318
     otel_console: bool = False
-    # Export prompts / responses / tool I/O on spans. Off by default in prod.
+    # Export prompts / responses / tool I/O on spans. On for local runs; the k8s
+    # manifests turn it off unless the trace backend is approved to hold customer text.
     trace_capture_content: bool = True
     trace_max_attr_chars: int = 4000
     # Direct-to-vendor exporters (used when there is no collector in front).
     langsmith_api_key: str | None = None
-    langsmith_project: str = "production-agent"
     langsmith_otlp_endpoint: str = "https://api.smith.langchain.com/otel/v1/traces"
     phoenix_collector_endpoint: str | None = None  # e.g. http://phoenix:6006/v1/traces
     anthropic_sdk_tracing: bool = False

@@ -1,0 +1,81 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: support-agent
+spec:
+  replicas: 4
+  revisionHistoryLimit: 5          # how far `kubectl argo rollouts undo` can go back
+  selector:
+    matchLabels:
+      app: support-agent
+  template:
+    metadata:
+      labels:
+        app: support-agent
+        app.kubernetes.io/version: v1.4.0   # set to the image tag by the deploy workflow
+    spec:
+      terminationGracePeriodSeconds: 120   # let in-flight agent runs (up to 90s) finish
+      containers:
+        - name: agent
+          image: support-agent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: support-agent-config
+            - secretRef:
+                name: support-agent-secrets
+          env:
+            - name: RELEASE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['app.kubernetes.io/version']
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 250m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+  strategy:
+    canary:
+      canaryService: support-agent-canary
+      stableService: support-agent-stable
+      trafficRouting:
+        nginx:
+          stableIngress: support-agent
+      # Runs for the whole rollout; any failed measurement aborts it, which
+      # shifts 100% of traffic back to stable (the automatic rollback).
+      analysis:
+        templates:
+          - templateName: agent-canary-analysis
+        startingStep: 2
+        args:
+          - name: canary-hash
+            valueFrom:
+              podTemplateHashValue: Latest
+          - name: stable-hash
+            valueFrom:
+              podTemplateHashValue: Stable
+      steps:
+        # 1. Canary pods up, no customer traffic; golden evals must pass.
+        - setCanaryScale: { replicas: 1 }
+        - analysis:
+            templates:
+              - templateName: agent-eval-gate
+        # 2. Progressive traffic with continuous analysis.
+        - setWeight: 10
+        - pause: { duration: 10m }
+        - setWeight: 25
+        - pause: { duration: 10m }
+        - setWeight: 50
+        - pause: { duration: 15m }

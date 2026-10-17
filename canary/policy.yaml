@@ -1,0 +1,26 @@
+# Progressive delivery policy, read by canary/controller.py (docker compose) and
+# mirrored in deploy/k8s/analysis-template.yaml (Argo Rollouts).
+# tests/test_policy_sync.py fails if the two drift apart.
+
+# Traffic weights (percent to canary) and how long each step runs before it is
+# analysed. Local values are short so a drill takes minutes; production would
+# use longer steps (10-30 min) and more traffic per step.
+steps: [10, 25, 50]
+step_duration_s: 120
+settle_s: 12               # wait for the last scrape before analysing a step
+max_inconclusive_extensions: 2
+
+# Pre-traffic gate: the golden eval set must pass against the canary
+# (header-routed, no customer traffic) before any weight is shifted.
+eval_gate:
+  min_pass_rate: 0.95
+
+analysis:
+  min_canary_requests: 25            # below this a step is inconclusive
+  max_failure_ratio: 0.05            # absolute ceiling for the canary
+  max_failure_ratio_delta: 0.02      # canary may be at most 2pp worse than stable
+  max_loop_ratio: 0.01               # loop-detector trips per request
+  max_p95_latency_ratio: 1.25        # canary p95 / stable p95
+  p95_latency_slack_s: 0.5           # ...ignoring differences below this
+  max_cost_per_request_ratio: 1.20   # canary $/request / stable $/request
+  block_on_critical_alerts: true     # any firing critical alert with track=canary fails the step

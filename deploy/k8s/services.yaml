@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: support-agent-stable
+spec:
+  selector: { app: support-agent }
+  ports: [{ name: http, port: 80, targetPort: http }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: support-agent-canary
+spec:
+  selector: { app: support-agent }
+  ports: [{ name: http, port: 80, targetPort: http }]

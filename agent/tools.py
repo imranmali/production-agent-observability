@@ -131,9 +131,7 @@ TOOLS: dict[str, Tool] = {
         Tool(
             "get_order",
             "Look up an order by its 5-digit order number. Returns status, items, dates and totals.",
-            _schema(
-                {"order_id": {"type": "string", "description": "Order number, e.g. 10231"}}, ["order_id"]
-            ),
+            _schema({"order_id": {"type": "string", "description": "Order number, e.g. 10231"}}, ["order_id"]),
             get_order,
         ),
         Tool(

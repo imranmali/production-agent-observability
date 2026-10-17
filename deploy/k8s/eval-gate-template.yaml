@@ -1,0 +1,33 @@
+# Pre-traffic gate: run the golden evals against the canary Service (which only
+# selects canary pods during a rollout) before any customer traffic is shifted.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: agent-eval-gate
+spec:
+  args:
+    - name: min-pass-rate
+      value: "0.95"
+  metrics:
+    - name: golden-evals
+      count: 1
+      failureLimit: 0
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            activeDeadlineSeconds: 900
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: evals
+                    image: support-agent
+                    command:
+                      - python
+                      - -m
+                      - evals.run_evals
+                      - --url
+                      - http://support-agent-canary
+                      - --min-pass-rate
+                      - "{{args.min-pass-rate}}"

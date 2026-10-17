@@ -107,9 +107,7 @@ class Agent:
             **self.labels, provider=llm.provider, model=llm.model, prompt_version=settings.prompt_version
         ).set(1)
 
-    async def run(
-        self, question: str, *, session_id: str | None = None, user_id: str | None = None
-    ) -> AgentResult:
+    async def run(self, question: str, *, session_id: str | None = None, user_id: str | None = None) -> AgentResult:
         request_id = uuid.uuid4().hex
         started = time.perf_counter()
         m.INFLIGHT.labels(**self.labels).inc()
@@ -220,9 +218,7 @@ class Agent:
     async def _call_llm(self, messages: list[dict[str, Any]], request_id: str, step: int, st: _RunState):
         labels = {**self.labels, "provider": self.llm.provider, "model": self.llm.model}
         with t.tracer().start_as_current_span("llm.call") as span:
-            t.mark_llm_span(
-                span, provider=self.llm.provider, model=self.llm.model, step=step, messages=messages
-            )
+            t.mark_llm_span(span, provider=self.llm.provider, model=self.llm.model, step=step, messages=messages)
             started = time.perf_counter()
             try:
                 resp = await self.llm.complete(

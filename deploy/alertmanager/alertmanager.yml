@@ -1,0 +1,42 @@
+# Routing: critical -> page, warning -> ticket/chat, info -> chat only.
+# Locally every receiver posts to alert-sink (http://localhost:9095) so the drill
+# can show exactly which notifications were sent. In production replace the
+# webhook_configs with the commented Slack/PagerDuty blocks.
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: chat
+  group_by: [alertname, track]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: page
+      continue: true
+    - matchers: [severity=~"warning|info"]
+      receiver: chat
+
+inhibit_rules:
+  # A page about loops on a track makes the info-level "a loop happened" redundant.
+  - source_matchers: [alertname="AgentLoopRateHigh"]
+    target_matchers: [alertname="AgentLoopDetected"]
+    equal: [track]
+
+receivers:
+  - name: page
+    webhook_configs:
+      - url: http://alert-sink:9095/page
+        send_resolved: true
+    # pagerduty_configs:
+    #   - routing_key_file: /etc/alertmanager/secrets/pagerduty_key
+  - name: chat
+    webhook_configs:
+      - url: http://alert-sink:9095/chat
+        send_resolved: true
+    # slack_configs:
+    #   - api_url_file: /etc/alertmanager/secrets/slack_webhook
+    #     channel: "#agent-alerts"
+    #     title: '{{ .CommonAnnotations.summary }}'
+    #     text: '{{ .CommonAnnotations.description }} {{ .CommonAnnotations.runbook_url }}'

@@ -1,0 +1,21 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: support-agent
+spec:
+  scaleTargetRef:
+    apiVersion: argoproj.io/v1alpha1
+    kind: Rollout
+    name: support-agent
+  minReplicas: 4
+  maxReplicas: 20
+  metrics:
+    # Agent requests are I/O-bound (waiting on the model), so CPU is a poor signal;
+    # scale on in-flight requests per pod via prometheus-adapter.
+    - type: Pods
+      pods:
+        metric:
+          name: agent_inflight_requests
+        target:
+          type: AverageValue
+          averageValue: "8"

@@ -68,9 +68,7 @@ class AnthropicClient:
             raise LLMError(str(e), kind="timeout", retryable=True) from e
         except anthropic.APIStatusError as e:
             kind = "server" if e.status_code >= 500 else "client"
-            raise LLMError(
-                str(e), kind=kind, retryable=e.status_code >= 500, status_code=e.status_code
-            ) from e
+            raise LLMError(str(e), kind=kind, retryable=e.status_code >= 500, status_code=e.status_code) from e
         except anthropic.APIConnectionError as e:
             raise LLMError(str(e), kind="connection", retryable=True) from e
 
@@ -81,9 +79,7 @@ class AnthropicClient:
             cache_read_tokens=getattr(u, "cache_read_input_tokens", 0) or 0,
             cache_write_tokens=getattr(u, "cache_creation_input_tokens", 0) or 0,
         )
-        tool_calls = [
-            ToolCall(id=b.id, name=b.name, input=dict(b.input)) for b in msg.content if b.type == "tool_use"
-        ]
+        tool_calls = [ToolCall(id=b.id, name=b.name, input=dict(b.input)) for b in msg.content if b.type == "tool_use"]
         text = "".join(b.text for b in msg.content if b.type == "text")
         fallback_used = any(b.type == "fallback" for b in msg.content) or any(
             getattr(it, "type", None) == "fallback_message" for it in (getattr(u, "iterations", None) or [])

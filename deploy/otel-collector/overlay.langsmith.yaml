@@ -1,0 +1,13 @@
+# Adds LangSmith as a trace destination (OTLP/HTTP ingestion).
+# Requires LANGSMITH_API_KEY. EU workspaces: LANGSMITH_OTLP_ENDPOINT=https://eu.api.smith.langchain.com/otel
+exporters:
+  otlphttp/langsmith:
+    endpoint: ${env:LANGSMITH_OTLP_ENDPOINT}
+    headers:
+      x-api-key: ${env:LANGSMITH_API_KEY}
+      Langsmith-Project: ${env:LANGSMITH_PROJECT}
+
+service:
+  pipelines:
+    traces:
+      exporters: [otlphttp/phoenix, otlphttp/langsmith, debug]

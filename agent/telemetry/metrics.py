@@ -44,13 +44,9 @@ LLM_LATENCY = Histogram(
 )
 TOKENS = Counter("agent_llm_tokens_total", "Tokens by type", [*BASE, "model", "type"])
 COST = Counter("agent_llm_cost_usd_total", "Model spend in USD", [*BASE, "model"])
-UNPRICED = Counter(
-    "agent_unpriced_model_calls_total", "Calls to a model missing from the price table", ["model"]
-)
+UNPRICED = Counter("agent_unpriced_model_calls_total", "Calls to a model missing from the price table", ["model"])
 REFUSALS = Counter("agent_llm_refusals_total", "Model refusals", [*BASE, "category"])
-FALLBACKS = Counter(
-    "agent_llm_fallbacks_total", "Requests served by a refusal-fallback model", [*BASE, "model"]
-)
+FALLBACKS = Counter("agent_llm_fallbacks_total", "Requests served by a refusal-fallback model", [*BASE, "model"])
 
 TOOL_CALLS = Counter("agent_tool_calls_total", "Tool invocations", [*BASE, "tool", "status"])
 TOOL_LATENCY = Histogram("agent_tool_latency_seconds", "Tool latency", [*BASE, "tool"], buckets=TOOL_BUCKETS)

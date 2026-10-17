@@ -1,0 +1,14 @@
+# Adds Arize AX as a trace destination (OTLP/gRPC).
+# Requires ARIZE_SPACE_ID and ARIZE_API_KEY. The project name comes from the
+# `openinference.project.name` resource attribute the agent sets (PROJECT_NAME).
+exporters:
+  otlp/arize:
+    endpoint: otlp.arize.com:443
+    headers:
+      space_id: ${env:ARIZE_SPACE_ID}
+      api_key: ${env:ARIZE_API_KEY}
+
+service:
+  pipelines:
+    traces:
+      exporters: [otlphttp/phoenix, otlp/arize, debug]

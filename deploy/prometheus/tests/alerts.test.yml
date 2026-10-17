@@ -1,0 +1,111 @@
+# promtool unit tests for the alert rules: `make test-rules`
+rule_files:
+  - ../rules/recording.yml
+  - ../rules/alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  # A canary whose prompt makes ~17% of requests loop: loop alerts fire on the
+  # canary only, and the canary-vs-stable regression alert fires.
+  - interval: 15s
+    input_series:
+      - series: 'agent_requests_total{track="stable",release="v1.4.0",outcome="success"}'
+        values: "0+60x80"
+      - series: 'agent_requests_total{track="canary",release="v1.5.0",outcome="success"}'
+        values: "0+10x80"
+      - series: 'agent_requests_total{track="canary",release="v1.5.0",outcome="loop_detected"}'
+        values: "0+2x80"
+      - series: 'agent_guardrail_trips_total{track="canary",release="v1.5.0",guardrail="loop_detected"}'
+        values: "0+2x80"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: AgentLoopRateHigh
+        exp_alerts:
+          - exp_labels: { severity: critical, track: canary, release: v1.5.0 }
+            exp_annotations:
+              summary: "16.67% of canary requests are looping"
+              description: "More than 2% of requests on v1.5.0 hit the loop detector for 2m. Usually a prompt or tool-schema regression; roll back the release."
+              runbook_url: docs/RUNBOOK.md#agentloopratehigh
+      - eval_time: 8m
+        alertname: AgentCanaryFailureRegression
+        exp_alerts:
+          - exp_labels: { severity: critical, track: canary }
+            exp_annotations:
+              summary: "Canary fails 16.67% of requests, >2pp worse than stable"
+              runbook_url: docs/RUNBOOK.md#agentcanaryfailureregression
+      - eval_time: 8m
+        alertname: AgentFailureRateHigh
+        exp_alerts:
+          - exp_labels: { severity: critical, track: canary, release: v1.5.0 }
+            exp_annotations:
+              summary: "16.67% of canary requests fail"
+              description: "Non-success outcomes (guardrail trips, provider errors, refusals, exceptions) above 5% for 3m on v1.5.0."
+              runbook_url: docs/RUNBOOK.md#agentfailureratehigh
+
+  # A healthy service: no failure or loop alerts.
+  - interval: 15s
+    input_series:
+      - series: 'agent_requests_total{track="stable",release="v1.4.0",outcome="success"}'
+        values: "0+60x80"
+      - series: 'agent_guardrail_trips_total{track="stable",release="v1.4.0",guardrail="loop_detected"}'
+        values: "0x80"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AgentLoopRateHigh
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: AgentLoopDetected
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: AgentFailureRateHigh
+        exp_alerts: []
+
+  # A single loop is worth an info notification, not a page.
+  - interval: 15s
+    input_series:
+      - series: 'agent_requests_total{track="stable",release="v1.4.0",outcome="success"}'
+        values: "0+60x80"
+      - series: 'agent_guardrail_trips_total{track="stable",release="v1.4.0",guardrail="loop_detected"}'
+        values: "0x40 1x40"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: AgentLoopDetected
+        exp_alerts:
+          - exp_labels: { severity: info, track: stable, release: v1.4.0 }
+            exp_annotations:
+              summary: "Loop guardrail tripped on stable (v1.4.0)"
+              description: "1 request(s) in the last 10m were stopped for repeating identical tool calls."
+              runbook_url: docs/RUNBOOK.md#agentloopdetected
+      - eval_time: 12m
+        alertname: AgentLoopRateHigh
+        exp_alerts: []
+
+  # Model API failing: provider-error alert and the fast error-budget burn page.
+  - interval: 15s
+    input_series:
+      - series: 'agent_llm_requests_total{track="stable",release="v1.4.0",provider="anthropic",model="claude-opus-5-5",status="ok"}'
+        values: "0+40x300"
+      - series: 'agent_llm_requests_total{track="stable",release="v1.4.0",provider="anthropic",model="claude-opus-5-5",status="server"}'
+        values: "0+20x300"
+      - series: 'agent_requests_total{track="stable",release="v1.4.0",outcome="success"}'
+        values: "0+20x300"
+      - series: 'agent_requests_total{track="stable",release="v1.4.0",outcome="provider_error"}'
+        values: "0+20x300"
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: AgentLLMProviderErrors
+        exp_alerts:
+          - exp_labels: { severity: critical, track: stable, release: v1.4.0 }
+            exp_annotations:
+              summary: "33.33% of model API calls fail on stable"
+              description: "Errors after the SDK's own retries. Check status.anthropic.com, rate limits, and the API key."
+              runbook_url: docs/RUNBOOK.md#agentllmprovidererrors
+      - eval_time: 70m
+        alertname: AgentErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "Burning the 30-day error budget 14x too fast"
+              description: "At this rate the 99% availability SLO's budget is gone in about 2 days."
+              runbook_url: docs/RUNBOOK.md#agenterrorbudgetfastburn

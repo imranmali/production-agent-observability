@@ -1,0 +1,6 @@
+# Teach kustomize's image transformer about the Argo Rollouts CRDs.
+images:
+  - path: spec/template/spec/containers/image
+    kind: Rollout
+  - path: spec/metrics/provider/job/spec/template/spec/containers/image
+    kind: AnalysisTemplate

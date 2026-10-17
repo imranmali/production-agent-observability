@@ -99,9 +99,7 @@ class SimulatedClient:
     ) -> LLMResponse:
         s = self._s
         rng = random.Random(f"{s.sim_seed}:{request_id}:{step}")
-        question = next(
-            m["content"] for m in messages if m["role"] == "user" and isinstance(m["content"], str)
-        )
+        question = next(m["content"] for m in messages if m["role"] == "user" and isinstance(m["content"], str))
 
         # Tool results already in the history.
         results: list[dict[str, Any]] = []
@@ -109,11 +107,7 @@ class SimulatedClient:
             if m["role"] == "user" and isinstance(m["content"], list):
                 results += [b for b in m["content"] if _block_type(b) == "tool_result"]
         calls_made = sum(
-            1
-            for m in messages
-            if m["role"] == "assistant"
-            for b in m["content"]
-            if _block_type(b) == "tool_use"
+            1 for m in messages if m["role"] == "assistant" for b in m["content"] if _block_type(b) == "tool_use"
         )
 
         plan = self._plan(question)

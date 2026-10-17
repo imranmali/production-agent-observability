@@ -1,0 +1,99 @@
+# Canary analysis for Argo Rollouts: the same gates as canary/policy.yaml
+# (tests/test_policy_sync.py keeps the thresholds in step). Each metric runs every
+# minute over a 5-minute window, comparing canary pods with stable pods by
+# pod-template hash. A failed measurement aborts the rollout -> automatic rollback.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: agent-canary-analysis
+spec:
+  args:
+    - name: canary-hash
+    - name: stable-hash
+    - name: prometheus-url
+      value: http://kube-prometheus-stack-prometheus.monitoring:9090
+    - name: min-canary-requests
+      value: "25"
+    - name: max-failure-ratio
+      value: "0.05"
+    - name: max-failure-ratio-delta
+      value: "0.02"
+    - name: max-loop-ratio
+      value: "0.01"
+    - name: max-p95-latency-ratio
+      value: "1.25"
+    - name: max-cost-per-request-ratio
+      value: "1.20"
+  metrics:
+    - name: canary-traffic
+      interval: 1m
+      count: 0                      # run until the rollout ends
+      # Too little traffic is inconclusive, not a failure; the rollout pauses for a human.
+      successCondition: result[0] >= {{args.min-canary-requests}}
+      failureCondition: "false"
+      inconclusiveLimit: 3
+      provider:
+        prometheus:
+          address: "{{args.prometheus-url}}"
+          query: sum(increase(agent_requests_total{pod_template_hash="{{args.canary-hash}}"}[5m]))
+
+    - name: failure-ratio
+      interval: 1m
+      failureLimit: 1
+      successCondition: isNaN(result[0]) || result[0] <= {{args.max-failure-ratio}}
+      provider:
+        prometheus:
+          address: "{{args.prometheus-url}}"
+          query: |
+            sum(rate(agent_requests_total{pod_template_hash="{{args.canary-hash}}",outcome!="success"}[5m]))
+              / sum(rate(agent_requests_total{pod_template_hash="{{args.canary-hash}}"}[5m]))
+
+    - name: failure-ratio-vs-stable
+      interval: 1m
+      failureLimit: 1
+      successCondition: isNaN(result[0]) || result[0] <= {{args.max-failure-ratio-delta}}
+      provider:
+        prometheus:
+          address: "{{args.prometheus-url}}"
+          query: |
+            (sum(rate(agent_requests_total{pod_template_hash="{{args.canary-hash}}",outcome!="success"}[5m])) or vector(0))
+              / sum(rate(agent_requests_total{pod_template_hash="{{args.canary-hash}}"}[5m]))
+            -
+            (sum(rate(agent_requests_total{pod_template_hash="{{args.stable-hash}}",outcome!="success"}[5m])) or vector(0))
+              / sum(rate(agent_requests_total{pod_template_hash="{{args.stable-hash}}"}[5m]))
+
+    - name: loop-ratio
+      interval: 1m
+      failureLimit: 0               # a looping canary is rolled back on the first bad minute
+      successCondition: isNaN(result[0]) || result[0] <= {{args.max-loop-ratio}}
+      provider:
+        prometheus:
+          address: "{{args.prometheus-url}}"
+          query: |
+            (sum(rate(agent_guardrail_trips_total{pod_template_hash="{{args.canary-hash}}",guardrail="loop_detected"}[5m])) or vector(0))
+              / sum(rate(agent_requests_total{pod_template_hash="{{args.canary-hash}}"}[5m]))
+
+    - name: p95-latency-ratio
+      interval: 1m
+      failureLimit: 2
+      successCondition: isNaN(result[0]) || result[0] <= {{args.max-p95-latency-ratio}}
+      provider:
+        prometheus:
+          address: "{{args.prometheus-url}}"
+          query: |
+            histogram_quantile(0.95, sum by (le) (rate(agent_request_duration_seconds_bucket{pod_template_hash="{{args.canary-hash}}"}[5m])))
+              / histogram_quantile(0.95, sum by (le) (rate(agent_request_duration_seconds_bucket{pod_template_hash="{{args.stable-hash}}"}[5m])))
+
+    - name: cost-per-request-ratio
+      interval: 1m
+      failureLimit: 2
+      successCondition: isNaN(result[0]) || result[0] <= {{args.max-cost-per-request-ratio}}
+      provider:
+        prometheus:
+          address: "{{args.prometheus-url}}"
+          query: |
+            (sum(rate(agent_llm_cost_usd_total{pod_template_hash="{{args.canary-hash}}"}[5m]))
+              / sum(rate(agent_requests_total{pod_template_hash="{{args.canary-hash}}"}[5m])))
+            /
+            (sum(rate(agent_llm_cost_usd_total{pod_template_hash="{{args.stable-hash}}"}[5m]))
+              / sum(rate(agent_requests_total{pod_template_hash="{{args.stable-hash}}"}[5m])))

@@ -1,0 +1,17 @@
+# Phoenix + LangSmith + Arize AX. Needs every credential from both overlays.
+exporters:
+  otlphttp/langsmith:
+    endpoint: ${env:LANGSMITH_OTLP_ENDPOINT}
+    headers:
+      x-api-key: ${env:LANGSMITH_API_KEY}
+      Langsmith-Project: ${env:LANGSMITH_PROJECT}
+  otlp/arize:
+    endpoint: otlp.arize.com:443
+    headers:
+      space_id: ${env:ARIZE_SPACE_ID}
+      api_key: ${env:ARIZE_API_KEY}
+
+service:
+  pipelines:
+    traces:
+      exporters: [otlphttp/phoenix, otlphttp/langsmith, otlp/arize, debug]

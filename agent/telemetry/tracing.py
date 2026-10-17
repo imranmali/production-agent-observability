@@ -48,6 +48,7 @@ def setup_tracing(settings: Settings) -> TracerProvider:
             "service.version": settings.release,
             "deployment.environment": settings.environment,
             "deployment.track": settings.deployment_track,
+            "openinference.project.name": settings.project_name,
         }
     )
     provider = TracerProvider(resource=resource)
@@ -55,9 +56,7 @@ def setup_tracing(settings: Settings) -> TracerProvider:
         endpoint = settings.otel_exporter_otlp_endpoint.rstrip("/") + "/v1/traces"
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
     if settings.phoenix_collector_endpoint:
-        provider.add_span_processor(
-            BatchSpanProcessor(OTLPSpanExporter(endpoint=settings.phoenix_collector_endpoint))
-        )
+        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=settings.phoenix_collector_endpoint)))
     if settings.langsmith_api_key:
         provider.add_span_processor(
             BatchSpanProcessor(
@@ -65,7 +64,7 @@ def setup_tracing(settings: Settings) -> TracerProvider:
                     endpoint=settings.langsmith_otlp_endpoint,
                     headers={
                         "x-api-key": settings.langsmith_api_key,
-                        "Langsmith-Project": settings.langsmith_project,
+                        "Langsmith-Project": settings.project_name,
                     },
                 )
             )
@@ -99,9 +98,7 @@ def set_io(span: Span, *, input: Any = None, output: Any = None) -> None:
         span.set_attribute("input.mime_type", "text/plain" if isinstance(input, str) else "application/json")
     if output is not None:
         span.set_attribute("output.value", _clip(output))
-        span.set_attribute(
-            "output.mime_type", "text/plain" if isinstance(output, str) else "application/json"
-        )
+        span.set_attribute("output.mime_type", "text/plain" if isinstance(output, str) else "application/json")
 
 
 def mark_agent_span(span: Span, *, request_id: str, session_id: str | None, user_id: str | None) -> None:

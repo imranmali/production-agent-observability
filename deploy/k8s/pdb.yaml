@@ -1,0 +1,9 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: support-agent
+spec:
+  minAvailable: 75%
+  selector:
+    matchLabels:
+      app: support-agent

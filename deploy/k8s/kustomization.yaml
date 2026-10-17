@@ -1,0 +1,36 @@
+# Production deployment on Kubernetes with Argo Rollouts.
+# Prerequisites in the cluster: Argo Rollouts controller, ingress-nginx,
+# Prometheus Operator (kube-prometheus-stack), and an OpenTelemetry Collector
+# reachable at otel-collector.observability:4318 running deploy/otel-collector/config.yaml.
+#
+#   kubectl create secret generic support-agent-secrets -n support-agent \
+#     --from-literal=ANTHROPIC_API_KEY=...
+#   kubectl apply -k deploy/k8s
+#   # ship a release (CI does this in .github/workflows/deploy.yml):
+#   kustomize edit set image support-agent=ghcr.io/imranmali/production-agent-observability:v1.4.1
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: support-agent
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - rollout.yaml
+  - services.yaml
+  - ingress.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - analysis-template.yaml
+  - eval-gate-template.yaml
+  - servicemonitor.yaml
+  - prometheusrule.yaml
+configurations:
+  - kustomizeconfig.yaml
+images:
+  - name: support-agent
+    newName: ghcr.io/imranmali/production-agent-observability
+    newTag: v1.4.0
+labels:
+  - pairs:
+      app.kubernetes.io/name: support-agent
+      app.kubernetes.io/part-of: production-agent-observability
+    includeSelectors: false

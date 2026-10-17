@@ -1,0 +1,75 @@
+# OpenTelemetry Collector: the one place traces leave the cluster from.
+# The agents only know OTLP -> collector; which LLM-observability vendors receive
+# the traces is decided here, so adding/removing LangSmith or Arize is a config
+# change, not a redeploy of the agent.
+#
+# Base pipeline: Phoenix (self-hosted). Overlays add vendors:
+#   OTEL_OVERLAY=overlay.langsmith.yaml   -> + LangSmith
+#   OTEL_OVERLAY=overlay.arize.yaml       -> + Arize AX
+#   OTEL_OVERLAY=overlay.all.yaml         -> + both
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  # Keep every failed or slow agent run; sample the healthy ones.
+  # decision_wait must exceed the longest request (REQUEST_TIMEOUT_S=90s), otherwise
+  # late root spans get a separate decision from their children.
+  tail_sampling:
+    decision_wait: 100s
+    num_traces: 50000
+    policies:
+      - name: errors
+        type: status_code
+        status_code: { status_codes: [ERROR] }
+      - name: slow
+        type: latency
+        latency: { threshold_ms: 15000 }
+      - name: baseline
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: ${env:TRACE_SAMPLE_PERCENT}
+
+  batch:
+    send_batch_size: 512
+    timeout: 2s
+
+exporters:
+  otlphttp/phoenix:
+    endpoint: http://phoenix:6006
+    tls: { insecure: true }
+
+  debug:
+    verbosity: basic
+    sampling_initial: 2
+    sampling_thereafter: 500
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, tail_sampling, batch]
+      exporters: [otlphttp/phoenix, debug]

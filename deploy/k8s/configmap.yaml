@@ -1,0 +1,22 @@
+# Release config. Changing it changes the pod template, so Argo Rollouts ships it
+# through the same canary steps and analysis as an image change.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: support-agent-config
+data:
+  LLM_PROVIDER: anthropic
+  MODEL: claude-opus-5-5
+  EFFORT: medium
+  PROMPT_VERSION: v1
+  MAX_STEPS: "8"
+  MAX_IDENTICAL_TOOL_CALLS: "3"
+  MAX_REQUEST_COST_USD: "0.50"
+  REQUEST_TIMEOUT_S: "90"
+  ENVIRONMENT: production
+  DEPLOYMENT_TRACK: rollout
+  PROJECT_NAME: production-agent
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability:4318
+  # Customer messages stay out of the trace backend unless its retention and
+  # access controls are approved for that data.
+  TRACE_CAPTURE_CONTENT: "false"
