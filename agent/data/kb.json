@@ -1,0 +1,10 @@
+[
+  {"id": "kb-returns", "title": "Return policy", "text": "Items can be returned within 30 days of delivery for a full refund. Items must be unused and in original packaging. Final-sale items cannot be returned. Return shipping is free for defective items; otherwise a 5.95 EUR label fee is deducted from the refund."},
+  {"id": "kb-refunds", "title": "Refund timing", "text": "Refunds are issued to the original payment method within 5 business days after the warehouse receives the return. Bank transfers can take an additional 2-3 business days to appear."},
+  {"id": "kb-shipping", "title": "Shipping times and costs", "text": "Standard shipping within Germany takes 2-4 business days and is free for orders over 50 EUR, otherwise 4.95 EUR. Express shipping takes 1 business day and costs 9.95 EUR. EU shipping takes 4-7 business days."},
+  {"id": "kb-warranty", "title": "Warranty", "text": "All electronics carry a 2-year statutory warranty. Within the first 12 months a defect is presumed to have existed at delivery. Warranty claims require the order number and a description of the defect."},
+  {"id": "kb-cancel", "title": "Cancelling an order", "text": "Orders can be cancelled free of charge until they are handed to the carrier (status 'processing'). Once an order is 'shipped' it cannot be cancelled but can be returned after delivery."},
+  {"id": "kb-payment", "title": "Payment methods", "text": "We accept credit card, PayPal, SEPA direct debit and invoice (Klarna). Invoice payment is due within 14 days."},
+  {"id": "kb-price-match", "title": "Price match", "text": "We match the price of authorised German retailers within 14 days of purchase. The difference is refunded as store credit."},
+  {"id": "kb-contact", "title": "Escalation and human support", "text": "Customers can request a human agent at any time. Human support is available Monday to Friday 8:00-18:00 CET. Escalations are handled via support tickets with priority low, normal or high."}
+]

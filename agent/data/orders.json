@@ -1,0 +1,7 @@
+{
+  "10231": {"status": "delivered", "delivered_on": "2026-10-02", "items": [{"sku": "HP-200", "name": "Noise-cancelling headphones", "price_eur": 179.0, "final_sale": false}], "total_eur": 179.0, "carrier": "DHL"},
+  "10232": {"status": "shipped", "shipped_on": "2026-10-14", "items": [{"sku": "KB-77", "name": "Mechanical keyboard", "price_eur": 129.0, "final_sale": false}], "total_eur": 129.0, "carrier": "DPD", "tracking": "DPD-88213004"},
+  "10233": {"status": "processing", "items": [{"sku": "MN-27", "name": "27-inch monitor", "price_eur": 289.0, "final_sale": false}, {"sku": "CB-01", "name": "USB-C cable", "price_eur": 12.0, "final_sale": false}], "total_eur": 301.0},
+  "10234": {"status": "delivered", "delivered_on": "2026-08-21", "items": [{"sku": "SP-10", "name": "Bluetooth speaker", "price_eur": 59.0, "final_sale": true}], "total_eur": 59.0, "carrier": "Hermes"},
+  "10235": {"status": "cancelled", "items": [{"sku": "CM-4K", "name": "4K webcam", "price_eur": 99.0, "final_sale": false}], "total_eur": 99.0}
+}
