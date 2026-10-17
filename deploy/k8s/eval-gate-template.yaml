@@ -8,6 +8,8 @@ spec:
   args:
     - name: min-pass-rate
       value: "0.95"
+    - name: max-guardrail-trips
+      value: "0"
   metrics:
     - name: golden-evals
       count: 1
@@ -31,3 +33,5 @@ spec:
                       - http://support-agent-canary
                       - --min-pass-rate
                       - "{{args.min-pass-rate}}"
+                      - --max-guardrail-trips
+                      - "{{args.max-guardrail-trips}}"

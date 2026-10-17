@@ -7,7 +7,9 @@ unit-tested without Prometheus; `collect` runs the PromQL.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -141,6 +143,30 @@ class Prometheus:
             if alert["state"] == "firing" and all(labels.get(k) == v for k, v in match.items()):
                 out.append(alert)
         return out
+
+
+def _parse_ts(value: str) -> datetime:
+    """Prometheus timestamps carry nanoseconds; datetime takes microseconds."""
+    value = re.sub(r"(\.\d{6})\d+", r"\1", value).replace("Z", "+00:00")
+    return datetime.fromisoformat(value)
+
+
+def canary_alerts(alerts: list[dict[str, Any]], release: str, since: datetime) -> list[str]:
+    """Critical alerts that belong to *this* canary: track=canary, the same release (or
+    no release label, as on the canary-vs-stable comparisons), and active only since
+    this canary started. Alerts on 5-minute windows keep firing for minutes after a
+    rollback; without the time filter they would fail the next, unrelated canary."""
+    out = []
+    for a in alerts:
+        labels = a["labels"]
+        if labels.get("track") != "canary" or labels.get("severity") != "critical":
+            continue
+        if labels.get("release") not in (None, release):
+            continue
+        if _parse_ts(a["activeAt"]) < since:
+            continue
+        out.append(labels["alertname"])
+    return out
 
 
 def collect(prom: Prometheus, track: str, release: str, window_s: int) -> TrackMetrics:

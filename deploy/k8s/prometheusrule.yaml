@@ -18,7 +18,7 @@ spec:
         description: '{{ $value | humanize }} request(s) in the last 10m were stopped for repeating identical tool calls.'
         runbook_url: docs/RUNBOOK.md#agentloopdetected
     - alert: AgentLoopRateHigh
-      expr: agent:loop_ratio:rate5m > 0.02 and agent:requests:rate5m > 0.05
+      expr: (agent:loop_ratio:rate5m > 0.02 and agent:requests:rate5m > 0.05) and on (track, release) agent_build_info
       for: 2m
       labels:
         severity: critical
@@ -27,7 +27,7 @@ spec:
         description: More than 2% of requests on {{ $labels.release }} hit the loop detector for 2m. Usually a prompt or tool-schema regression; roll back the release.
         runbook_url: docs/RUNBOOK.md#agentloopratehigh
     - alert: AgentStepBudgetExhausted
-      expr: agent:max_steps_ratio:rate5m > 0.05 and agent:requests:rate5m > 0.05
+      expr: (agent:max_steps_ratio:rate5m > 0.05 and agent:requests:rate5m > 0.05) and on (track, release) agent_build_info
       for: 5m
       labels:
         severity: warning
@@ -37,7 +37,7 @@ spec:
   - name: agent-failures
     rules:
     - alert: AgentFailureRateHigh
-      expr: agent:failure_ratio:rate5m > 0.05 and agent:requests:rate5m > 0.05
+      expr: (agent:failure_ratio:rate5m > 0.05 and agent:requests:rate5m > 0.05) and on (track, release) agent_build_info
       for: 3m
       labels:
         severity: critical
@@ -63,7 +63,7 @@ spec:
         summary: Burning the 30-day error budget 6x too fast
         runbook_url: docs/RUNBOOK.md#agenterrorbudgetslowburn
     - alert: AgentLLMProviderErrors
-      expr: agent:llm_error_ratio:rate5m > 0.10
+      expr: agent:llm_error_ratio:rate5m > 0.10 and on (track, release) agent_build_info
       for: 3m
       labels:
         severity: critical
@@ -82,7 +82,7 @@ spec:
   - name: agent-latency-cost
     rules:
     - alert: AgentLatencyP95High
-      expr: agent:latency_seconds:p95_5m > 20 and agent:requests:rate5m > 0.05
+      expr: (agent:latency_seconds:p95_5m > 20 and agent:requests:rate5m > 0.05) and on (track, release) agent_build_info
       for: 10m
       labels:
         severity: warning

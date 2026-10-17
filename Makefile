@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 PY ?= .venv/bin/python
 PROMETHEUS_IMAGE := prom/prometheus:v3.5.0
+ALERTMANAGER_IMAGE := prom/alertmanager:v0.28.1
 RELEASE ?=
 
 .DEFAULT_GOAL := help
@@ -21,9 +22,13 @@ lint: ## Ruff lint + format check
 test: ## Unit tests
 	$(PY) -m pytest -q
 
-test-rules: ## promtool: validate and unit-test the alert rules
+test-rules: ## promtool + amtool: validate and unit-test alert rules and routing
 	docker run --rm -v $(PWD)/deploy/prometheus:/p -w /p --entrypoint promtool $(PROMETHEUS_IMAGE) check rules rules/recording.yml rules/alerts.yml
 	docker run --rm -v $(PWD)/deploy/prometheus:/p -w /p/tests --entrypoint promtool $(PROMETHEUS_IMAGE) test rules alerts.test.yml
+	docker run --rm -v $(PWD)/deploy/alertmanager:/c --entrypoint amtool $(ALERTMANAGER_IMAGE) check-config /c/alertmanager.yml
+	@# routing contract: canary alerts never page (the controller rolls back), stable criticals do
+	test "$$(docker run --rm -v $(PWD)/deploy/alertmanager:/c --entrypoint amtool $(ALERTMANAGER_IMAGE) config routes test --config.file=/c/alertmanager.yml track=canary severity=critical)" = chat
+	test "$$(docker run --rm -v $(PWD)/deploy/alertmanager:/c --entrypoint amtool $(ALERTMANAGER_IMAGE) config routes test --config.file=/c/alertmanager.yml track=stable severity=critical)" = page
 
 generated: ## Regenerate Grafana dashboards and the k8s PrometheusRule
 	$(PY) scripts/build_dashboards.py

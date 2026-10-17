@@ -28,7 +28,9 @@ def test_argo_analysis_thresholds_match_policy():
 def test_eval_gate_pass_rate_matches_policy():
     template = yaml.safe_load((ROOT / "deploy/k8s/eval-gate-template.yaml").read_text())
     args = {a["name"]: a.get("value") for a in template["spec"]["args"]}
-    assert float(args["min-pass-rate"]) == load_policy()["eval_gate"]["min_pass_rate"]
+    gate = load_policy()["eval_gate"]
+    assert float(args["min-pass-rate"]) == gate["min_pass_rate"]
+    assert int(args["max-guardrail-trips"]) == gate["max_guardrail_trips"]
 
 
 def test_rollout_steps_match_policy_weights():

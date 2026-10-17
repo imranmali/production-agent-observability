@@ -14,6 +14,9 @@ max_inconclusive_extensions: 2
 # (header-routed, no customer traffic) before any weight is shifted.
 eval_gate:
   min_pass_rate: 0.95
+  # Any loop / step / budget trip on a golden case blocks the release. Added after
+  # the 2026-10-17 drill, where v1.5.0 passed at exactly 95% with one looping case.
+  max_guardrail_trips: 0
 
 analysis:
   min_canary_requests: 25            # below this a step is inconclusive

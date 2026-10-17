@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import random
+import signal
 import time
 from collections import Counter, defaultdict
 
@@ -71,10 +72,15 @@ async def main_async(url: str, rps: float, duration: float, seed: int) -> None:
             stats[track][outcome] += 1
             latencies[track].append(time.perf_counter() - started)
 
+        stop = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, stop.set)
+
         end = time.monotonic() + duration if duration else float("inf")
         last_report = time.monotonic()
         try:
-            while time.monotonic() < end:
+            while time.monotonic() < end and not stop.is_set():
                 await asyncio.sleep(rng.expovariate(rps))
                 task = asyncio.create_task(one(sent))
                 tasks.add(task)

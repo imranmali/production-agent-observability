@@ -23,6 +23,9 @@ from typing import Any
 import httpx
 
 GOLDEN = Path(__file__).parent / "golden.jsonl"
+# Outcomes that mean a guardrail had to stop the agent. On a golden case, even one
+# is a release blocker, independent of the pass rate (see docs/results/).
+GUARDRAIL_OUTCOMES = {"loop_detected", "max_steps", "token_budget", "cost_budget", "timeout"}
 
 
 def load_cases(path: Path = GOLDEN) -> list[dict[str, Any]]:
@@ -55,13 +58,20 @@ def run_case(client: httpx.Client, url: str, case: dict[str, Any], headers: dict
         )
         resp = r.json()
     except (httpx.HTTPError, json.JSONDecodeError) as e:
-        return {"id": case["id"], "passed": False, "problems": [f"request failed: {e}"], "release": None}
+        return {
+            "id": case["id"],
+            "passed": False,
+            "problems": [f"request failed: {e}"],
+            "release": None,
+            "outcome": None,
+        }
     problems = check_case(case, resp)
     return {
         "id": case["id"],
         "passed": not problems,
         "problems": problems,
         "release": resp.get("release"),
+        "outcome": resp.get("outcome"),
         "cost_usd": resp.get("cost_usd", 0.0),
         "duration_s": resp.get("duration_s", 0.0),
         "trace_id": resp.get("trace_id"),
@@ -90,6 +100,7 @@ def run_suite(
         "passed": passed,
         "pass_rate": passed / len(results) if results else 0.0,
         "failures": [{"id": r["id"], "problems": r["problems"]} for r in results if not r["passed"]],
+        "guardrail_trips": sum(r.get("outcome") in GUARDRAIL_OUTCOMES for r in results),
         "cost_usd": round(sum(r.get("cost_usd", 0.0) for r in results), 6),
         "results": results,
     }
@@ -100,6 +111,7 @@ def main() -> None:
     p.add_argument("--url", default="http://localhost:8080")
     p.add_argument("--canary", action="store_true", help="pin requests to the canary (X-Canary: always)")
     p.add_argument("--min-pass-rate", type=float, default=0.95)
+    p.add_argument("--max-guardrail-trips", type=int, default=0)
     p.add_argument("--out", type=Path)
     args = p.parse_args()
     report = run_suite(args.url, headers={"X-Canary": "always"} if args.canary else None)
@@ -108,7 +120,9 @@ def main() -> None:
     print(f"\n{report['passed']}/{report['total']} passed ({report['pass_rate']:.0%}), cost ${report['cost_usd']:.4f}")
     if args.out:
         args.out.write_text(json.dumps(report, indent=2))
-    sys.exit(0 if report["pass_rate"] >= args.min_pass_rate else 1)
+    print(f"guardrail trips: {report['guardrail_trips']} (max {args.max_guardrail_trips})")
+    ok = report["pass_rate"] >= args.min_pass_rate and report["guardrail_trips"] <= args.max_guardrail_trips
+    sys.exit(0 if ok else 1)
 
 
 if __name__ == "__main__":

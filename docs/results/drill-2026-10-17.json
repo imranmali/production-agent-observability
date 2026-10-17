@@ -1,0 +1,413 @@
+{
+  "since": "2026-10-17T09:56:36Z",
+  "until": "2026-10-17T10:15:48Z",
+  "events": [
+    {
+      "ts": "2026-10-17T09:59:36+00:00",
+      "event": "canary_start",
+      "release": "v1.4.1",
+      "stable": "v1.4.0"
+    },
+    {
+      "ts": "2026-10-17T09:59:57+00:00",
+      "event": "eval_gate",
+      "release": "v1.4.1",
+      "passed": true,
+      "pass_rate": 1.0,
+      "cases": 20,
+      "failures": []
+    },
+    {
+      "ts": "2026-10-17T09:59:57+00:00",
+      "event": "step_start",
+      "release": "v1.4.1",
+      "weight": 10,
+      "duration_s": 120
+    },
+    {
+      "ts": "2026-10-17T10:02:11+00:00",
+      "event": "step_analysis",
+      "release": "v1.4.1",
+      "weight": 10,
+      "verdict": "pass",
+      "reason": "",
+      "checks": [
+        {
+          "name": "failure ratio",
+          "passed": true,
+          "observed": "0.00%",
+          "limit": "2.00%"
+        },
+        {
+          "name": "loop ratio",
+          "passed": true,
+          "observed": "0.00%",
+          "limit": "1.00%"
+        },
+        {
+          "name": "p95 latency",
+          "passed": true,
+          "observed": "2.82s vs stable 2.81s",
+          "limit": "3.52s"
+        },
+        {
+          "name": "cost per request",
+          "passed": true,
+          "observed": "$0.00438 vs stable $0.00384",
+          "limit": "$0.00461"
+        }
+      ]
+    },
+    {
+      "ts": "2026-10-17T10:02:11+00:00",
+      "event": "step_start",
+      "release": "v1.4.1",
+      "weight": 25,
+      "duration_s": 120
+    },
+    {
+      "ts": "2026-10-17T10:04:25+00:00",
+      "event": "step_analysis",
+      "release": "v1.4.1",
+      "weight": 25,
+      "verdict": "pass",
+      "reason": "",
+      "checks": [
+        {
+          "name": "failure ratio",
+          "passed": true,
+          "observed": "0.00%",
+          "limit": "2.00%"
+        },
+        {
+          "name": "loop ratio",
+          "passed": true,
+          "observed": "0.00%",
+          "limit": "1.00%"
+        },
+        {
+          "name": "p95 latency",
+          "passed": true,
+          "observed": "2.47s vs stable 2.86s",
+          "limit": "3.58s"
+        },
+        {
+          "name": "cost per request",
+          "passed": true,
+          "observed": "$0.00403 vs stable $0.00375",
+          "limit": "$0.00450"
+        }
+      ]
+    },
+    {
+      "ts": "2026-10-17T10:04:25+00:00",
+      "event": "step_start",
+      "release": "v1.4.1",
+      "weight": 50,
+      "duration_s": 120
+    },
+    {
+      "ts": "2026-10-17T10:06:39+00:00",
+      "event": "step_analysis",
+      "release": "v1.4.1",
+      "weight": 50,
+      "verdict": "pass",
+      "reason": "",
+      "checks": [
+        {
+          "name": "failure ratio",
+          "passed": true,
+          "observed": "0.00%",
+          "limit": "2.00%"
+        },
+        {
+          "name": "loop ratio",
+          "passed": true,
+          "observed": "0.00%",
+          "limit": "1.00%"
+        },
+        {
+          "name": "p95 latency",
+          "passed": true,
+          "observed": "2.50s vs stable 2.92s",
+          "limit": "3.65s"
+        },
+        {
+          "name": "cost per request",
+          "passed": true,
+          "observed": "$0.00409 vs stable $0.00398",
+          "limit": "$0.00477"
+        }
+      ]
+    },
+    {
+      "ts": "2026-10-17T10:06:39+00:00",
+      "event": "promote_start",
+      "release": "v1.4.1",
+      "previous": "v1.4.0"
+    },
+    {
+      "ts": "2026-10-17T10:06:56+00:00",
+      "event": "promoted",
+      "release": "v1.4.1",
+      "previous": "v1.4.0"
+    },
+    {
+      "ts": "2026-10-17T10:06:56+00:00",
+      "event": "canary_start",
+      "release": "v1.5.0",
+      "stable": "v1.4.1"
+    },
+    {
+      "ts": "2026-10-17T10:07:05+00:00",
+      "event": "step_start",
+      "release": "v1.5.0",
+      "weight": 10,
+      "duration_s": 120
+    },
+    {
+      "ts": "2026-10-17T10:09:20+00:00",
+      "event": "step_analysis",
+      "release": "v1.5.0",
+      "weight": 10,
+      "verdict": "fail",
+      "reason": "failure ratio, loop ratio, p95 latency, cost per request",
+      "checks": [
+        {
+          "name": "failure ratio",
+          "passed": false,
+          "observed": "8.34%",
+          "limit": "2.00%"
+        },
+        {
+          "name": "loop ratio",
+          "passed": false,
+          "observed": "8.35%",
+          "limit": "1.00%"
+        },
+        {
+          "name": "p95 latency",
+          "passed": false,
+          "observed": "6.11s vs stable 2.37s",
+          "limit": "2.96s"
+        },
+        {
+          "name": "cost per request",
+          "passed": false,
+          "observed": "$0.00702 vs stable $0.00402",
+          "limit": "$0.00483"
+        }
+      ]
+    },
+    {
+      "ts": "2026-10-17T10:09:20+00:00",
+      "event": "rollback",
+      "release": "v1.5.0",
+      "stable": "v1.4.1",
+      "reason": "step 10%: failure ratio, loop ratio, p95 latency, cost per request"
+    },
+    {
+      "ts": "2026-10-17T10:09:21+00:00",
+      "event": "rollback_done",
+      "release": "v1.5.0",
+      "traffic_shift_s": 1.18
+    },
+    {
+      "ts": "2026-10-17T10:09:51+00:00",
+      "event": "canary_start",
+      "release": "v1.5.0",
+      "stable": "v1.4.1"
+    },
+    {
+      "ts": "2026-10-17T10:10:15+00:00",
+      "event": "eval_gate",
+      "release": "v1.5.0",
+      "passed": true,
+      "pass_rate": 0.95,
+      "cases": 20,
+      "failures": [
+        {
+          "id": "total-math",
+          "problems": [
+            "outcome=loop_detected (calculate called 3x with identical arguments)",
+            "answer lacks '301'"
+          ]
+        }
+      ]
+    },
+    {
+      "ts": "2026-10-17T10:10:15+00:00",
+      "event": "step_start",
+      "release": "v1.5.0",
+      "weight": 10,
+      "duration_s": 120
+    },
+    {
+      "ts": "2026-10-17T10:10:58+00:00",
+      "event": "step_analysis",
+      "release": "v1.5.0",
+      "weight": 10,
+      "verdict": "fail",
+      "reason": "critical alert firing",
+      "checks": [
+        {
+          "name": "critical alerts on canary",
+          "passed": false,
+          "observed": "AgentLoopRateHigh, AgentCanaryFailureRegression",
+          "limit": "none"
+        }
+      ]
+    },
+    {
+      "ts": "2026-10-17T10:10:58+00:00",
+      "event": "rollback",
+      "release": "v1.5.0",
+      "stable": "v1.4.1",
+      "reason": "step 10%: critical alert firing"
+    },
+    {
+      "ts": "2026-10-17T10:11:00+00:00",
+      "event": "rollback_done",
+      "release": "v1.5.0",
+      "traffic_shift_s": 1.56
+    },
+    {
+      "ts": "2026-10-17T10:11:00+00:00",
+      "event": "stable_rollback_start",
+      "current": "v1.4.1",
+      "target": "v1.4.0"
+    },
+    {
+      "ts": "2026-10-17T10:11:36+00:00",
+      "event": "stable_rollback_done",
+      "current": "v1.4.0",
+      "reverted": "v1.4.1"
+    }
+  ],
+  "alerts": [
+    {
+      "received_at": "2026-10-17T10:08:54Z",
+      "channel": "chat",
+      "status": "firing",
+      "alertname": "AgentLoopDetected",
+      "severity": "info",
+      "track": "canary",
+      "release": "v1.5.0",
+      "summary": "Loop guardrail tripped on canary (v1.5.0)",
+      "starts_at": "2026-10-17T10:08:44.776Z"
+    },
+    {
+      "received_at": "2026-10-17T10:10:54Z",
+      "channel": "page",
+      "status": "firing",
+      "alertname": "AgentLoopRateHigh",
+      "severity": "critical",
+      "track": "canary",
+      "release": "v1.5.0",
+      "summary": "7.898% of canary requests are looping",
+      "starts_at": "2026-10-17T10:10:44.776Z"
+    },
+    {
+      "received_at": "2026-10-17T10:10:56Z",
+      "channel": "page",
+      "status": "firing",
+      "alertname": "AgentCanaryFailureRegression",
+      "severity": "critical",
+      "track": "canary",
+      "release": null,
+      "summary": "Canary fails 7.898% of requests, >2pp worse than stable",
+      "starts_at": "2026-10-17T10:10:46.603Z"
+    },
+    {
+      "received_at": "2026-10-17T10:12:08Z",
+      "channel": "page",
+      "status": "firing",
+      "alertname": "AgentFailureRateHigh",
+      "severity": "critical",
+      "track": "canary",
+      "release": "v1.5.0",
+      "summary": "10.13% of canary requests fail",
+      "starts_at": "2026-10-17T10:11:58.405Z"
+    },
+    {
+      "received_at": "2026-10-17T10:12:36Z",
+      "channel": "chat",
+      "status": "firing",
+      "alertname": "AgentCanaryCostRegression",
+      "severity": "warning",
+      "track": "canary",
+      "release": null,
+      "summary": "Canary costs $0.0066/request, >30% above stable",
+      "starts_at": "2026-10-17T10:12:26.603Z"
+    }
+  ],
+  "releases": [
+    {
+      "track": "canary",
+      "release": "v1.4.0",
+      "requests": 38.45513962264151,
+      "p50": 1.4285714285714286,
+      "p95": 3.050000000000002,
+      "cost": 0.1407816350173585,
+      "steps": 88.04203018867925,
+      "failure_ratio": 0.0,
+      "loop_ratio": 0.0,
+      "cost_per_request": 0.0036609315789473684,
+      "steps_per_request": 2.289473684210526
+    },
+    {
+      "track": "canary",
+      "release": "v1.4.1",
+      "requests": 416.90476190476187,
+      "p50": 1.2335766423357666,
+      "p95": 2.563157894736841,
+      "cost": 1.6957681214285676,
+      "steps": 953.2142857142857,
+      "failure_ratio": 0.0,
+      "loop_ratio": 0.0,
+      "cost_per_request": 0.004067519194745851,
+      "steps_per_request": 2.2864077669902914
+    },
+    {
+      "track": "canary",
+      "release": "v1.5.0",
+      "requests": 72.10434782608695,
+      "failures": 7.304347826086956,
+      "loops": 7.304347826086956,
+      "p50": 2.666766826923077,
+      "p95": 5.7491545893719795,
+      "cost": 0.4879667081081082,
+      "steps": 184.1142857142857,
+      "failure_ratio": 0.10130246020260493,
+      "loop_ratio": 0.10130246020260493,
+      "cost_per_request": 0.0067675074086387425,
+      "steps_per_request": 2.5534422162497417
+    },
+    {
+      "track": "stable",
+      "release": "v1.4.0",
+      "requests": 2290.977391304348,
+      "p50": 1.4055194805194806,
+      "p95": 2.8719202898550726,
+      "cost": 8.813731417043426,
+      "steps": 5053.773913043478,
+      "failure_ratio": 0.0,
+      "loop_ratio": 0.0,
+      "cost_per_request": 0.003847149016178376,
+      "steps_per_request": 2.2059466550065583
+    },
+    {
+      "track": "stable",
+      "release": "v1.4.1",
+      "requests": 769.5192307692307,
+      "p50": 1.2149805447470816,
+      "p95": 2.400423728813559,
+      "cost": 3.0757444999999928,
+      "steps": 1727.5961538461538,
+      "failure_ratio": 0.0,
+      "loop_ratio": 0.0,
+      "cost_per_request": 0.003996968986630004,
+      "steps_per_request": 2.2450331125827816
+    }
+  ]
+}

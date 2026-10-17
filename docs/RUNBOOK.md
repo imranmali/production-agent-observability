@@ -26,7 +26,8 @@ The guardrail already did its job (the customer got a fallback answer, spend was
 
 *critical.* More than 2% of requests on a track loop for 2 minutes.
 
-- If `track=canary`: roll back (`make rollback`). The canary controller also does this on its own.
+- If `track=canary`: the controller has most likely rolled back already (check `make status`); this
+  reaches chat, not the pager. If it hasn't, `make rollback`.
 - If `track=stable` and a deploy happened recently: `make rollback` reverts stable to the previous release.
 - If no deploy: something outside the code changed. Check the model (a fallback model serving traffic,
   `agent_llm_fallbacks_total`), tool outputs (a tool returning an error the model keeps retrying:
@@ -103,8 +104,10 @@ fallback, or a release switching `MODEL`). Cost dashboards under-report until yo
 
 ## AgentCanaryFailureRegression
 
-*critical.* The canary fails more than 2 percentage points more often than stable. The controller
-aborts on it; if the controller is not running (manual canary), run `make rollback`.
+*critical, routed to chat.* The canary fails more than 2 percentage points more often than stable.
+The controller (or Argo Rollouts) aborts on it, usually before this alert fires, so canary alerts are
+routed to chat as a record rather than paging. If you are running a canary by hand without the
+controller, watch the canary dashboard and run `make rollback` yourself.
 
 ## AgentCanaryCostRegression
 

@@ -646,7 +646,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (track) (agent:failure_ratio:rate5m)",
+          "expr": "(sum by (track) (rate(agent_requests_total{outcome!=\"success\"}[5m])) or sum by (track) (rate(agent_requests_total[5m])) * 0) / sum by (track) (rate(agent_requests_total[5m]))",
           "legendFormat": "{{track}}",
           "refId": "A",
           "instant": false,
@@ -829,7 +829,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (track) (agent:latency_seconds:p50_5m)",
+          "expr": "histogram_quantile(0.50, sum by (track, le) (rate(agent_request_duration_seconds_bucket[5m])))",
           "legendFormat": "p50 {{track}}",
           "refId": "A",
           "instant": false,
@@ -840,7 +840,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (track) (agent:latency_seconds:p95_5m)",
+          "expr": "histogram_quantile(0.95, sum by (track, le) (rate(agent_request_duration_seconds_bucket[5m])))",
           "legendFormat": "p95 {{track}}",
           "refId": "B",
           "instant": false,
@@ -1104,7 +1104,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (track) (agent:cost_per_request_usd:rate5m)",
+          "expr": "sum by (track) (rate(agent_llm_cost_usd_total[5m])) / sum by (track) (rate(agent_requests_total[5m]))",
           "legendFormat": "{{track}}",
           "refId": "A",
           "instant": false,
@@ -1337,7 +1337,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (track) (agent:steps_per_request:avg5m)",
+          "expr": "sum by (track) (rate(agent_steps_per_request_sum[5m])) / sum by (track) (rate(agent_steps_per_request_count[5m]))",
           "legendFormat": "{{track}}",
           "refId": "A",
           "instant": false,

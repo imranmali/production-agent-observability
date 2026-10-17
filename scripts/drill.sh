@@ -43,7 +43,7 @@ $PY -m canary.controller rollback
 echo "exit=$?"
 
 sleep 60
-kill -INT $LOAD_PID 2>/dev/null
+kill -TERM $LOAD_PID 2>/dev/null  # SIGINT is ignored by background jobs of a script
 wait $LOAD_PID 2>/dev/null
 finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "drill finished $finished"

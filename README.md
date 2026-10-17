@@ -11,7 +11,44 @@ on Kubernetes with Argo Rollouts.
 
 ## Results
 
-<!-- RESULTS -->
+One scripted drill (`make drill`) under continuous load: 3 req/s for 19 minutes, 3,482
+requests, on the **simulated provider** ([ADR 0005](docs/adr/0005-simulated-provider.md)). Every
+number below is in [`docs/results/drill-2026-10-17.md`](docs/results/drill-2026-10-17.md),
+generated from Prometheus, the controller's event log and the notifications Alertmanager delivered.
+
+| # | What was shipped | Gate that decided | Outcome | Time | Customer requests on the bad release |
+|---|---|---|---|---|---|
+| 1 | `v1.4.1` good (effort low, 6 steps) | eval gate 20/20, then 10 → 25 → 50% all checks pass | **promoted** | 7m20s | n/a |
+| 2 | `v1.5.0` bad (prompt v2), eval gate skipped | 10% step: failure ratio 8.34% (limit 2%), loop ratio 8.35% (limit 1%), p95 6.11s vs stable 2.37s, cost/request +75% | **automatic rollback**, traffic off in 1.18s | 2m15s at 10% | 72 total for both attempts, 7 of them looped |
+| 3 | `v1.5.0` again, with the eval gate as first written | gate passed at exactly 95% (one looping case), then a still-firing alert failed it at 10% | **automatic rollback** | 43s at 10% | (in row 2) |
+| 4 | `v1.5.0` again, after the gate fix | eval gate: 95% pass but 1 guardrail trip, now a hard fail | **rejected before traffic** | 31s | 0 |
+| 5 | manual `make rollback` of stable `v1.4.1` → `v1.4.0` | n/a | stable reverted, no failed requests | 36s | n/a |
+
+Stable served 3,061 requests across the drill with **0 failures**, including through the promotion and
+the manual rollback (both swap releases without dropping requests).
+
+![Canary analysis dashboard during the drill](docs/img/grafana-canary.png)
+
+*Stable (blue) vs canary (orange). From left: the good canary ramping to 50% and being promoted
+(~10:07), then the bad one: loop ratio, failure ratio, p95 and cost per request all jump at 10%
+traffic, and the traffic share drops back as it is rolled back. Purple markers are the controller's
+deploy annotations.*
+
+### What the drill found, and what changed
+
+- **The eval gate alone let the bad release through** (row 3): 19/20 golden cases passed, the one loop
+  was within the 95% threshold. Now any guardrail trip on a golden case blocks the release; the same
+  release was then stopped before traffic (row 4).
+- **A leftover alert from the first attempt failed the second one.** Correct here, but it would also
+  have failed an unrelated next release. The controller now only counts alerts for this canary's
+  release raised after it started, and per-release alerts stop once the release is no longer running.
+- **The page arrived 93 s after the automatic rollback.** Canary alerts now go to chat (the controller
+  remediates); only stable pages a human. `make test-rules` asserts that routing.
+- **The dashboards showed a phantom 2× on stable during the promotion** (per-release ratios summed per
+  track). Fixed by computing per-track ratios from raw counters.
+- **Cost per request is a noisy gate at low traffic:** the good canary ran +14% over stable at the 10%
+  step (limit +20%) on ~40 requests, because the simulated traffic mix varies. Longer steps or a
+  traffic-mix-adjusted comparison would tighten it; the threshold was left as is.
 
 ## What's in the box
 
@@ -22,8 +59,8 @@ on Kubernetes with Argo Rollouts.
 | Tracing | One trace per request (`agent.run` → `llm.call` → `tool.*`), OpenInference + GenAI semconv + LangSmith attributes; Collector with tail sampling fans out to Phoenix / LangSmith / Arize AX | `agent/telemetry/tracing.py`, `deploy/otel-collector/`, [ADR 0001](docs/adr/0001-otel-collector-fan-out.md), [ADR 0006](docs/adr/0006-sampling-and-content.md) |
 | Metrics | Requests by outcome, latency histograms, steps/request, tokens by type, USD cost, tool calls, guardrail trips, refusals, fallbacks; every series labelled `release` and `track` | `agent/telemetry/metrics.py`, `deploy/prometheus/rules/recording.yml` |
 | Dashboards | *Agent overview* (SLOs, latency, cost, tokens, cache hit ratio, behaviour, error budget) and *Agent canary analysis* (stable vs canary on every gate), deploy annotations | `scripts/build_dashboards.py` → `deploy/grafana/dashboards/` |
-| Alerting | 13 rules: loop detected / loop rate, step budget, failure rate, multi-window SLO burn, provider errors, target down, p95, spend/hour, unpriced model, canary failure and cost regressions; unit-tested with promtool; routed critical → page, warning/info → chat | `deploy/prometheus/rules/alerts.yml`, `deploy/prometheus/tests/`, `deploy/alertmanager/`, [RUNBOOK](docs/RUNBOOK.md) |
-| Canary | Eval gate at 0% traffic → 10 → 25 → 50% with analysis vs stable (failure ratio, loop ratio, p95, cost/request, critical alerts) → promote or roll back | `canary/`, `evals/`, [ADR 0004](docs/adr/0004-canary-gates.md) |
+| Alerting | 13 rules: loop detected / loop rate, step budget, failure rate, multi-window SLO burn, provider errors, target down, p95, spend/hour, unpriced model, canary failure and cost regressions; unit-tested with promtool; stable critical → page, canary and warning/info → chat (routing asserted with amtool) | `deploy/prometheus/rules/alerts.yml`, `deploy/prometheus/tests/`, `deploy/alertmanager/`, [RUNBOOK](docs/RUNBOOK.md) |
+| Canary | Eval gate at 0% traffic (≥95% pass, zero guardrail trips) → 10 → 25 → 50% with analysis vs stable (failure ratio, loop ratio, p95, cost/request, this canary's critical alerts) → promote or roll back | `canary/`, `evals/`, [ADR 0004](docs/adr/0004-canary-gates.md) |
 | Rollback | Automatic on any failed gate (traffic to 0% first); `make rollback` aborts a canary or reverts stable to the previous release with no dropped requests | `canary/controller.py` |
 | Kubernetes | Argo Rollouts `Rollout` + `AnalysisTemplate`s (same thresholds, checked by a test), ServiceMonitor, generated PrometheusRule, HPA on in-flight requests, PDB | `deploy/k8s/` |
 | CI/CD | Lint, unit tests, promtool, kustomize + kubeconform (CRDs included), full-stack smoke test; tag → GHCR image; manual deploy workflow (ship / rollback) | `.github/workflows/` |
@@ -84,12 +121,19 @@ tokens and cost; one LLM span per model call with model, token counts (including
 and cost; one tool span per tool call with arguments and result. Guardrail trips appear as an
 event on the root span, with the span marked as an error.
 
-<!-- TRACE_IMG -->
+![A loop caught in Phoenix](docs/img/phoenix-loop-trace.png)
+
+*A request on the bad canary: two `get_order` calls, the third identical one refused by the loop
+detector, the customer gets a fallback answer, the trace is kept by tail sampling because it is an
+error. Phoenix's own "cost" column reads $0 because it prices from its own model table; cost here
+comes from Prometheus (`agent_llm_cost_usd_total`) and the `llm.cost.total` span attribute.*
+
+The *Agent overview* dashboard for the same window: [`docs/img/grafana-overview.png`](docs/img/grafana-overview.png).
 
 ## Development
 
 ```bash
-make check       # ruff, pytest (37 tests), promtool rule tests
+make check       # ruff, pytest (44 tests), promtool rule tests, amtool routing tests
 make generated   # rebuild dashboards and the k8s PrometheusRule after changing rules/panels
 ```
 

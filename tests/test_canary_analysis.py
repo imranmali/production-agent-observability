@@ -52,3 +52,27 @@ def test_cost_regression_fails():
 def test_firing_critical_alert_fails_immediately():
     v = evaluate(m(), m(), POLICY, firing_critical=["AgentLoopRateHigh"])
     assert v.status == "fail" and "alert" in v.reason
+
+
+def test_only_this_canarys_alerts_block_it():
+    from datetime import UTC, datetime
+
+    from canary.analysis import canary_alerts
+
+    started = datetime(2026, 10, 17, 10, 9, 51, tzinfo=UTC)
+
+    def alert(name, active_at, release="v1.5.0", track="canary", severity="critical"):
+        labels = {"alertname": name, "track": track, "severity": severity}
+        if release:
+            labels["release"] = release
+        return {"labels": labels, "activeAt": active_at, "state": "firing"}
+
+    alerts = [
+        alert("LeftoverFromLastAttempt", "2026-10-17T10:08:44.776896051Z"),
+        alert("OtherRelease", "2026-10-17T10:10:30Z", release="v1.4.9"),
+        alert("StableOnly", "2026-10-17T10:10:30Z", track="stable"),
+        alert("JustWarning", "2026-10-17T10:10:30Z", severity="warning"),
+        alert("ThisCanary", "2026-10-17T10:10:30.5Z"),
+        alert("CanaryVsStable", "2026-10-17T10:10:31.123456789Z", release=None),
+    ]
+    assert canary_alerts(alerts, "v1.5.0", started) == ["ThisCanary", "CanaryVsStable"]

@@ -12,6 +12,12 @@ route:
   group_interval: 1m
   repeat_interval: 4h
   routes:
+    # The canary controller (or Argo Rollouts) rolls a bad canary back on its own,
+    # usually before the alert's `for:` window ends: in the 2026-10-17 drill the
+    # loop-rate page arrived 93s after the rollback. Canary alerts go to chat as a
+    # record; a human is paged only for what is still serving customers (stable).
+    - matchers: [track="canary"]
+      receiver: chat
     - matchers: [severity="critical"]
       receiver: page
       continue: true

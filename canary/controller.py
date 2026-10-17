@@ -29,7 +29,7 @@ from typing import Any
 
 import httpx
 
-from canary.analysis import Prometheus, Verdict, collect, evaluate, load_policy
+from canary.analysis import Prometheus, Verdict, canary_alerts, collect, evaluate, load_policy
 
 ROOT = Path(__file__).resolve().parent.parent
 RELEASES = ROOT / "releases"
@@ -188,12 +188,14 @@ def run_eval_gate(release: str, policy: dict[str, Any]) -> bool:
     from evals.run_evals import run_suite
 
     report = run_suite(GATEWAY, headers={"X-Canary": "always"}, expect_release=release)
-    ok = report["pass_rate"] >= policy["eval_gate"]["min_pass_rate"]
+    gate = policy["eval_gate"]
+    ok = report["pass_rate"] >= gate["min_pass_rate"] and report["guardrail_trips"] <= gate["max_guardrail_trips"]
     log(
         "eval_gate",
         release=release,
         passed=ok,
         pass_rate=round(report["pass_rate"], 3),
+        guardrail_trips=report["guardrail_trips"],
         cases=report["total"],
         failures=report["failures"],
     )
@@ -210,6 +212,7 @@ def cmd_deploy(release: str, skip_evals: bool = False) -> int:
         sys.exit(f"{release} is already stable")
 
     prom = Prometheus(PROM_URL)
+    canary_started = datetime.now(UTC)
     log("canary_start", release=release, stable=stable)
     annotate(f"canary {release} started (stable {stable})", ["canary", release])
     write_env("canary", release)
@@ -231,16 +234,13 @@ def cmd_deploy(release: str, skip_evals: bool = False) -> int:
             deadline = time.monotonic() + window
             while time.monotonic() < deadline:
                 time.sleep(5)
-                firing = [
-                    a["labels"]["alertname"]
-                    for a in prom.firing_alerts(track="canary", severity="critical")
-                    if policy["analysis"]["block_on_critical_alerts"]
-                ]
-                if firing:  # don't wait out the step while a page is firing
+                firing = canary_alerts(prom.firing_alerts(), release, canary_started)
+                if firing and policy["analysis"]["block_on_critical_alerts"]:
+                    # don't wait out the step while a page is firing
                     break
             time.sleep(policy["settle_s"])
             elapsed = policy["step_duration_s"] * (extensions + 1) + policy["settle_s"]
-            verdict = analyse(prom, release, stable, elapsed, policy)
+            verdict = analyse(prom, release, stable, elapsed, policy, canary_started)
             log(
                 "step_analysis",
                 release=release,
@@ -260,10 +260,12 @@ def cmd_deploy(release: str, skip_evals: bool = False) -> int:
     return do_promote(release, stable)
 
 
-def analyse(prom: Prometheus, release: str, stable: str, window_s: float, policy: dict[str, Any]) -> Verdict:
+def analyse(
+    prom: Prometheus, release: str, stable: str, window_s: float, policy: dict[str, Any], since: datetime
+) -> Verdict:
     canary_m = collect(prom, "canary", release, int(window_s))
     stable_m = collect(prom, "stable", stable, int(window_s))
-    firing = [a["labels"]["alertname"] for a in prom.firing_alerts(track="canary", severity="critical")]
+    firing = canary_alerts(prom.firing_alerts(), release, since)
     return evaluate(canary_m, stable_m, policy, firing)
 
 

@@ -15,6 +15,20 @@ from typing import Any
 OUT = Path(__file__).resolve().parent.parent / "deploy" / "grafana" / "dashboards"
 DS = {"type": "prometheus", "uid": "prometheus"}
 STABLE, CANARY = "#3987e5", "#d95926"
+# Per-track SLIs from the raw counters. Summing the per-release recording rules by
+# track would add two releases' ratios together during a promotion, when both are
+# inside the 5-minute window (the first drill's dashboards showed a phantom 2x).
+REQ = "sum by (track) (rate(agent_requests_total[5m]))"
+FAILURE_RATIO = f'(sum by (track) (rate(agent_requests_total{{outcome!="success"}}[5m])) or {REQ} * 0) / {REQ}'
+LOOP_RATIO = (
+    f'(sum by (track) (rate(agent_guardrail_trips_total{{guardrail="loop_detected"}}[5m])) or {REQ} * 0) / {REQ}'
+)
+P50 = "histogram_quantile(0.50, sum by (track, le) (rate(agent_request_duration_seconds_bucket[5m])))"
+P95 = "histogram_quantile(0.95, sum by (track, le) (rate(agent_request_duration_seconds_bucket[5m])))"
+COST_PER_REQ = f"sum by (track) (rate(agent_llm_cost_usd_total[5m])) / {REQ}"
+STEPS = (
+    "sum by (track) (rate(agent_steps_per_request_sum[5m])) / sum by (track) (rate(agent_steps_per_request_count[5m]))"
+)
 SERIES = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
 
 
@@ -290,7 +304,7 @@ def overview() -> dict[str, Any]:
         ts(
             L,
             "Failure ratio by track",
-            [target("sum by (track) (agent:failure_ratio:rate5m)", "{{track}}")],
+            [target(FAILURE_RATIO, "{{track}}")],
             "percentunit",
             "Non-success share per track. Alert at 5%.",
             threshold=0.05,
@@ -314,8 +328,8 @@ def overview() -> dict[str, Any]:
             L,
             "Request latency p50 / p95 by track",
             [
-                target("sum by (track) (agent:latency_seconds:p50_5m)", "p50 {{track}}", "A"),
-                target("sum by (track) (agent:latency_seconds:p95_5m)", "p95 {{track}}", "B"),
+                target(P50, "p50 {{track}}", "A"),
+                target(P95, "p95 {{track}}", "B"),
             ],
             "s",
             "End-to-end agent latency (all model calls and tools).",
@@ -352,7 +366,7 @@ def overview() -> dict[str, Any]:
         ts(
             L,
             "Cost per request by track",
-            [target("sum by (track) (agent:cost_per_request_usd:rate5m)", "{{track}}")],
+            [target(COST_PER_REQ, "{{track}}")],
             "currencyUSD",
             "Average spend per request; the canary gate allows +20%.",
         )
@@ -390,7 +404,7 @@ def overview() -> dict[str, Any]:
         ts(
             L,
             "Model calls per request by track",
-            [target("sum by (track) (agent:steps_per_request:avg5m)", "{{track}}")],
+            [target(STEPS, "{{track}}")],
             "short",
             "Average agent steps (model calls) per request. Rising = the agent is wandering.",
             w=8,
@@ -472,35 +486,35 @@ def canary() -> dict[str, Any]:
         ),
         (
             "Failure ratio",
-            "sum by (track) (agent:failure_ratio:rate5m)",
+            FAILURE_RATIO,
             "percentunit",
             0.05,
             "Gate: canary <= stable + 2pp and <= 5%.",
         ),
         (
             "Loop ratio",
-            "sum by (track) (agent:loop_ratio:rate5m)",
+            LOOP_RATIO,
             "percentunit",
             0.01,
             "Gate: canary <= 1%.",
         ),
         (
             "p95 latency",
-            "sum by (track) (agent:latency_seconds:p95_5m)",
+            P95,
             "s",
             None,
             "Gate: canary <= 1.25x stable.",
         ),
         (
             "Cost per request",
-            "sum by (track) (agent:cost_per_request_usd:rate5m)",
+            COST_PER_REQ,
             "currencyUSD",
             None,
             "Gate: canary <= 1.2x stable.",
         ),
         (
             "Model calls per request",
-            "sum by (track) (agent:steps_per_request:avg5m)",
+            STEPS,
             "short",
             None,
             "Average agent steps per request.",
@@ -516,7 +530,7 @@ def canary() -> dict[str, Any]:
             "title": "Running releases",
             "description": "agent_build_info per track.",
             "datasource": DS,
-            "gridPos": L.place(10, 6),
+            "gridPos": L.place(12, 6),
             "targets": [
                 target(
                     "max by (track, release, model, prompt_version, provider) (agent_build_info)",
@@ -526,6 +540,7 @@ def canary() -> dict[str, Any]:
             ],
             "transformations": [
                 {"id": "labelsToFields", "options": {"mode": "columns"}},
+                {"id": "merge", "options": {}},
                 {"id": "organize", "options": {"excludeByName": {"Time": True, "Value": True}}},
             ],
             "options": {"showHeader": True},
@@ -539,10 +554,11 @@ def canary() -> dict[str, Any]:
             "title": "Firing alerts",
             "description": "Prometheus alerts currently firing (ALERTS series).",
             "datasource": DS,
-            "gridPos": L.place(14, 6),
+            "gridPos": L.place(12, 6),
             "targets": [target('ALERTS{alertstate="firing"}', "", instant=True)],
             "transformations": [
                 {"id": "labelsToFields", "options": {"mode": "columns"}},
+                {"id": "merge", "options": {}},
                 {
                     "id": "organize",
                     "options": {"excludeByName": {"Time": True, "Value": True, "__name__": True, "alertstate": True}},

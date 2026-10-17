@@ -18,6 +18,10 @@ tests:
         values: "0+2x80"
       - series: 'agent_guardrail_trips_total{track="canary",release="v1.5.0",guardrail="loop_detected"}'
         values: "0+2x80"
+      - series: 'agent_build_info{track="stable",release="v1.4.0",provider="simulated",model="claude-opus-5-5",prompt_version="v1"}'
+        values: "1x300"
+      - series: 'agent_build_info{track="canary",release="v1.5.0",provider="simulated",model="claude-opus-5-5",prompt_version="v1"}'
+        values: "1x300"
     alert_rule_test:
       - eval_time: 8m
         alertname: AgentLoopRateHigh
@@ -92,6 +96,8 @@ tests:
         values: "0+20x300"
       - series: 'agent_requests_total{track="stable",release="v1.4.0",outcome="provider_error"}'
         values: "0+20x300"
+      - series: 'agent_build_info{track="stable",release="v1.4.0",provider="simulated",model="claude-opus-5-5",prompt_version="v1"}'
+        values: "1x300"
     alert_rule_test:
       - eval_time: 70m
         alertname: AgentLLMProviderErrors
@@ -109,3 +115,30 @@ tests:
               summary: "Burning the 30-day error budget 14x too fast"
               description: "At this rate the 99% availability SLO's budget is gone in about 2 days."
               runbook_url: docs/RUNBOOK.md#agenterrorbudgetfastburn
+
+  # A rolled-back release stops paging: once its build_info disappears (the
+  # container now runs another release) the failure alerts stop, even though the
+  # 5-minute window still holds its bad requests.
+  - interval: 15s
+    input_series:
+      - series: 'agent_requests_total{track="canary",release="v1.5.0",outcome="success"}'
+        values: "0+10x40 _x40"
+      - series: 'agent_requests_total{track="canary",release="v1.5.0",outcome="loop_detected"}'
+        values: "0+2x40 _x40"
+      - series: 'agent_guardrail_trips_total{track="canary",release="v1.5.0",guardrail="loop_detected"}'
+        values: "0+2x40 _x40"
+      - series: 'agent_build_info{track="canary",release="v1.5.0",provider="simulated",model="claude-opus-5-5",prompt_version="v2"}'
+        # `stale`: what Prometheus records when the restarted container stops exposing the series
+        values: "1x40 stale"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: AgentLoopRateHigh
+        exp_alerts:
+          - exp_labels: { severity: critical, track: canary, release: v1.5.0 }
+            exp_annotations:
+              summary: "16.67% of canary requests are looping"
+              description: "More than 2% of requests on v1.5.0 hit the loop detector for 2m. Usually a prompt or tool-schema regression; roll back the release."
+              runbook_url: docs/RUNBOOK.md#agentloopratehigh
+      - eval_time: 11m
+        alertname: AgentLoopRateHigh
+        exp_alerts: []

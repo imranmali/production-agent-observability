@@ -1,4 +1,7 @@
 # Alerts. Severity: critical = page, warning = ticket/Slack, info = FYI.
+# Per-release alerts are joined with agent_build_info so they only fire for a
+# release that is still running: 5-minute windows otherwise keep a rolled-back
+# release "failing" for minutes after it stopped serving anyone.
 # Every alert has a runbook section in docs/RUNBOOK.md (anchor = alert name).
 groups:
   - name: agent-loops
@@ -12,7 +15,7 @@ groups:
           runbook_url: docs/RUNBOOK.md#agentloopdetected
 
       - alert: AgentLoopRateHigh
-        expr: agent:loop_ratio:rate5m > 0.02 and agent:requests:rate5m > 0.05
+        expr: (agent:loop_ratio:rate5m > 0.02 and agent:requests:rate5m > 0.05) and on (track, release) agent_build_info
         for: 2m
         labels: { severity: critical }
         annotations:
@@ -21,7 +24,7 @@ groups:
           runbook_url: docs/RUNBOOK.md#agentloopratehigh
 
       - alert: AgentStepBudgetExhausted
-        expr: agent:max_steps_ratio:rate5m > 0.05 and agent:requests:rate5m > 0.05
+        expr: (agent:max_steps_ratio:rate5m > 0.05 and agent:requests:rate5m > 0.05) and on (track, release) agent_build_info
         for: 5m
         labels: { severity: warning }
         annotations:
@@ -31,7 +34,7 @@ groups:
   - name: agent-failures
     rules:
       - alert: AgentFailureRateHigh
-        expr: agent:failure_ratio:rate5m > 0.05 and agent:requests:rate5m > 0.05
+        expr: (agent:failure_ratio:rate5m > 0.05 and agent:requests:rate5m > 0.05) and on (track, release) agent_build_info
         for: 3m
         labels: { severity: critical }
         annotations:
@@ -57,7 +60,7 @@ groups:
           runbook_url: docs/RUNBOOK.md#agenterrorbudgetslowburn
 
       - alert: AgentLLMProviderErrors
-        expr: agent:llm_error_ratio:rate5m > 0.10
+        expr: agent:llm_error_ratio:rate5m > 0.10 and on (track, release) agent_build_info
         for: 3m
         labels: { severity: critical }
         annotations:
@@ -76,7 +79,7 @@ groups:
   - name: agent-latency-cost
     rules:
       - alert: AgentLatencyP95High
-        expr: agent:latency_seconds:p95_5m > 20 and agent:requests:rate5m > 0.05
+        expr: (agent:latency_seconds:p95_5m > 20 and agent:requests:rate5m > 0.05) and on (track, release) agent_build_info
         for: 10m
         labels: { severity: warning }
         annotations:
@@ -105,9 +108,9 @@ groups:
     rules:
       - alert: AgentCanaryFailureRegression
         expr: |
-          max without (release) (agent:failure_ratio:rate5m{track="canary"})
+          max without (release) (agent:failure_ratio:rate5m{track="canary"} and on (track, release) agent_build_info)
             > ignoring (track)
-          (max without (release) (agent:failure_ratio:rate5m{track="stable"}) + 0.02)
+          (max without (release) (agent:failure_ratio:rate5m{track="stable"} and on (track, release) agent_build_info) + 0.02)
           and on () sum(agent:requests:rate5m{track="canary"}) > 0.05
         for: 2m
         labels: { severity: critical, track: canary }
@@ -117,9 +120,9 @@ groups:
 
       - alert: AgentCanaryCostRegression
         expr: |
-          max without (release) (agent:cost_per_request_usd:rate5m{track="canary"})
+          max without (release) (agent:cost_per_request_usd:rate5m{track="canary"} and on (track, release) agent_build_info)
             > ignoring (track)
-          (1.3 * max without (release) (agent:cost_per_request_usd:rate5m{track="stable"}))
+          (1.3 * max without (release) (agent:cost_per_request_usd:rate5m{track="stable"} and on (track, release) agent_build_info))
           and on () sum(agent:requests:rate5m{track="canary"}) > 0.05
         for: 5m
         labels: { severity: warning, track: canary }
