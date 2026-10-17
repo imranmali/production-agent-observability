@@ -19,7 +19,7 @@ generated from Prometheus, the controller's event log and the notifications Aler
 | # | What was shipped | Gate that decided | Outcome | Time | Customer requests on the bad release |
 |---|---|---|---|---|---|
 | 1 | `v1.4.1` good (effort low, 6 steps) | eval gate 20/20, then 10 → 25 → 50% all checks pass | **promoted** | 7m20s | n/a |
-| 2 | `v1.5.0` bad (prompt v2), eval gate skipped | 10% step: failure ratio 8.34% (limit 2%), loop ratio 8.35% (limit 1%), p95 6.11s vs stable 2.37s, cost/request +75% | **automatic rollback**, traffic off in 1.18s | 2m15s at 10% | 72 total for both attempts, 7 of them looped |
+| 2 | `v1.5.0` bad (prompt v2), eval gate skipped | 10% step: failure ratio 8.34% (limit 2%), loop ratio 8.35% (limit 1%), p95 6.11s vs stable 2.37s, cost/request +75% | **automatic rollback**, traffic off in 1.18s | 2m15s at 10% | ~52 over both attempts (Prometheus counts 72 incl. 20 eval-gate requests); 7 got the loop fallback answer (load generator's count) |
 | 3 | `v1.5.0` again, with the eval gate as first written | gate passed at exactly 95% (one looping case), then a still-firing alert failed it at 10% | **automatic rollback** | 43s at 10% | (in row 2) |
 | 4 | `v1.5.0` again, after the gate fix | eval gate: 95% pass but 1 guardrail trip, now a hard fail | **rejected before traffic** | 31s | 0 |
 | 5 | manual `make rollback` of stable `v1.4.1` → `v1.4.0` | n/a | stable reverted, no failed requests | 36s | n/a |
