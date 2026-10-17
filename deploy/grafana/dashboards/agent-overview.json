@@ -263,7 +263,7 @@
       "type": "stat",
       "id": 6,
       "title": "Spend / hour",
-      "description": "Model spend at the current rate. Budget alert at $5/hour.",
+      "description": "Model spend at the current rate. Budget alert at $60/hour.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -311,11 +311,11 @@
               },
               {
                 "color": "#eda100",
-                "value": 3
+                "value": 40
               },
               {
                 "color": "#e34948",
-                "value": 5
+                "value": 60
               }
             ]
           },
@@ -522,6 +522,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -615,6 +616,7 @@
               "mode": "normal"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -677,6 +679,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": 0.1,
             "thresholdsStyle": {
               "mode": "dashed"
             }
@@ -783,6 +786,7 @@
               "mode": "normal"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -869,6 +873,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -962,6 +967,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -1037,6 +1043,7 @@
               "mode": "normal"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -1130,6 +1137,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -1223,6 +1231,7 @@
               "mode": "normal"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -1285,6 +1294,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -1360,6 +1370,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -1453,6 +1464,7 @@
               "mode": "normal"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -1515,6 +1527,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -1669,6 +1682,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": 28.8,
             "thresholdsStyle": {
               "mode": "dashed"
             }

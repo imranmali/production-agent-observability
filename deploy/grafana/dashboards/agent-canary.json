@@ -117,6 +117,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -210,6 +211,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": 0.1,
             "thresholdsStyle": {
               "mode": "dashed"
             }
@@ -316,6 +318,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": 0.02,
             "thresholdsStyle": {
               "mode": "dashed"
             }
@@ -422,6 +425,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -515,6 +519,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -608,6 +613,7 @@
               "mode": "none"
             },
             "axisSoftMin": 0,
+            "axisSoftMax": null,
             "thresholdsStyle": {
               "mode": "off"
             }

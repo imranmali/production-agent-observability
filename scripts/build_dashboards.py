@@ -126,6 +126,7 @@ def ts(
     by_track: bool = True,
     threshold: float | None = None,
     min0: bool = True,
+    soft_max: float | None = None,
 ) -> dict[str, Any]:
     defaults: dict[str, Any] = {
         "unit": unit,
@@ -137,6 +138,7 @@ def ts(
             "spanNulls": True,
             "stacking": {"mode": "normal" if stack else "none"},
             "axisSoftMin": 0 if min0 else None,
+            "axisSoftMax": soft_max if soft_max is not None else (threshold * 2 if threshold else None),
             "thresholdsStyle": {"mode": "dashed" if threshold is not None else "off"},
         },
     }
@@ -238,8 +240,8 @@ def overview() -> dict[str, Any]:
             "Spend / hour",
             "sum(rate(agent_llm_cost_usd_total[5m])) * 3600",
             "currencyUSD",
-            [(green, None), (amber, 3), (red, 5)],
-            "Model spend at the current rate. Budget alert at $5/hour.",
+            [(green, None), (amber, 40), (red, 60)],
+            "Model spend at the current rate. Budget alert at $60/hour.",
             decimals=2,
         ),
         stat(

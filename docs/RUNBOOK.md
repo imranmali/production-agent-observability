@@ -87,7 +87,7 @@ vs *Model calls per request* (more steps). An `EFFORT` increase in a release sho
 
 ## AgentCostBurnHigh
 
-*warning.* Spend above $5/hour for 15 minutes (tune the threshold per environment in
+*warning.* Spend above $60/hour for 15 minutes (tune the threshold per environment in
 `deploy/prometheus/rules/alerts.yml`).
 
 - Traffic or price? *Requests / s* vs *Cost per request*.

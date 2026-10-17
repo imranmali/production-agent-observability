@@ -84,12 +84,13 @@ groups:
           runbook_url: docs/RUNBOOK.md#agentlatencyp95high
 
       - alert: AgentCostBurnHigh
-        # Hourly spend budget for this service. Tune per environment.
-        expr: sum(rate(agent_llm_cost_usd_total[15m])) * 3600 > 5
+        # Hourly spend budget for this service (~$1,400/day at the drill's 3 req/s on
+        # Opus-tier pricing). Tune per environment and traffic.
+        expr: sum(rate(agent_llm_cost_usd_total[15m])) * 3600 > 60
         for: 15m
         labels: { severity: warning }
         annotations:
-          summary: "Model spend running at ${{ $value | printf \"%.2f\" }}/hour (budget $5/hour)"
+          summary: "Model spend running at ${{ $value | printf \"%.2f\" }}/hour (budget $60/hour)"
           runbook_url: docs/RUNBOOK.md#agentcostburnhigh
 
       - alert: AgentUnpricedModel
