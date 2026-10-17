@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 620" width="1040" height="620" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#52514e"/>
+    </marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2a78d6"/>
+    </marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d95926"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#199e70"/>
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #c3c2b7; stroke-width: 1.5; }
+      .agent { fill: #eef4fc; stroke: #2a78d6; stroke-width: 1.5; }
+      .canary { fill: #fdf0ea; stroke: #d95926; stroke-width: 1.5; }
+      .obs { fill: #ecf8f3; stroke: #199e70; stroke-width: 1.5; }
+      .ctrl { fill: #f3f1fc; stroke: #6250d6; stroke-width: 1.5; }
+      .t { fill: #0b0b0b; font-weight: 600; }
+      .s { fill: #52514e; font-size: 11.5px; }
+      .l { fill: #52514e; font-size: 11px; }
+      .line { stroke: #52514e; stroke-width: 1.4; fill: none; }
+      .trace { stroke: #199e70; stroke-width: 1.4; fill: none; stroke-dasharray: 5 3; }
+      .metric { stroke: #2a78d6; stroke-width: 1.4; fill: none; }
+      .ctl { stroke: #d95926; stroke-width: 1.4; fill: none; stroke-dasharray: 2 3; }
+    </style>
+  </defs>
+  <rect width="1040" height="620" fill="#fcfcfb"/>
+
+  <!-- client -->
+  <rect class="box" x="20" y="200" width="120" height="64" rx="8"/>
+  <text class="t" x="80" y="226" text-anchor="middle">Clients</text>
+  <text class="s" x="80" y="244" text-anchor="middle">POST /v1/chat</text>
+
+  <!-- traefik -->
+  <rect class="box" x="180" y="186" width="150" height="92" rx="8"/>
+  <text class="t" x="255" y="210" text-anchor="middle">Traefik gateway</text>
+  <text class="s" x="255" y="228" text-anchor="middle">weighted split</text>
+  <text class="s" x="255" y="244" text-anchor="middle">stable 90 / canary 10</text>
+  <text class="s" x="255" y="260" text-anchor="middle">X-Canary: always|never</text>
+  <path class="line" d="M140,232 H178" marker-end="url(#a)"/>
+
+  <!-- agents -->
+  <rect class="agent" x="380" y="110" width="210" height="112" rx="8"/>
+  <text class="t" x="485" y="134" text-anchor="middle">agent-stable  (v1.4.x)</text>
+  <text class="s" x="485" y="153" text-anchor="middle">tool loop: model → tools → model</text>
+  <text class="s" x="485" y="170" text-anchor="middle">guardrails: loop detector, step,</text>
+  <text class="s" x="485" y="186" text-anchor="middle">token, cost and time budgets</text>
+  <text class="s" x="485" y="208" text-anchor="middle">/metrics · OTLP spans · JSON logs</text>
+
+  <rect class="canary" x="380" y="250" width="210" height="80" rx="8"/>
+  <text class="t" x="485" y="274" text-anchor="middle">agent-canary  (candidate)</text>
+  <text class="s" x="485" y="293" text-anchor="middle">same image, release config from</text>
+  <text class="s" x="485" y="309" text-anchor="middle">releases/&lt;version&gt;.env</text>
+  <path class="line" d="M330,218 C355,200 355,170 378,168" marker-end="url(#a)"/>
+  <path class="line" d="M330,250 C355,262 355,288 378,290" marker-end="url(#a)"/>
+
+  <!-- anthropic -->
+  <rect class="box" x="380" y="20" width="210" height="58" rx="8"/>
+  <text class="t" x="485" y="44" text-anchor="middle">Claude (Messages API)</text>
+  <text class="s" x="485" y="62" text-anchor="middle">or simulated provider in CI / drills</text>
+  <path class="line" d="M485,110 V80" marker-end="url(#a)"/>
+
+  <!-- collector -->
+  <rect class="obs" x="650" y="150" width="170" height="92" rx="8"/>
+  <text class="t" x="735" y="174" text-anchor="middle">OTel Collector</text>
+  <text class="s" x="735" y="192" text-anchor="middle">tail sampling: keep all</text>
+  <text class="s" x="735" y="208" text-anchor="middle">errors + slow, sample rest</text>
+  <text class="s" x="735" y="226" text-anchor="middle">fan-out by config overlay</text>
+  <path class="trace" d="M590,170 H648" marker-end="url(#ag)"/>
+  <path class="trace" d="M590,280 C620,280 620,220 648,218" marker-end="url(#ag)"/>
+
+  <!-- trace backends -->
+  <rect class="obs" x="870" y="40" width="150" height="56" rx="8"/>
+  <text class="t" x="945" y="64" text-anchor="middle">Arize Phoenix</text>
+  <text class="s" x="945" y="81" text-anchor="middle">self-hosted (default)</text>
+  <rect class="obs" x="870" y="120" width="150" height="56" rx="8"/>
+  <text class="t" x="945" y="144" text-anchor="middle">LangSmith</text>
+  <text class="s" x="945" y="161" text-anchor="middle">overlay.langsmith.yaml</text>
+  <rect class="obs" x="870" y="200" width="150" height="56" rx="8"/>
+  <text class="t" x="945" y="224" text-anchor="middle">Arize AX</text>
+  <text class="s" x="945" y="241" text-anchor="middle">overlay.arize.yaml</text>
+  <path class="trace" d="M820,180 C845,180 845,70 868,68" marker-end="url(#ag)"/>
+  <path class="trace" d="M820,190 C845,190 845,148 868,148" marker-end="url(#ag)"/>
+  <path class="trace" d="M820,210 C845,210 845,228 868,228" marker-end="url(#ag)"/>
+
+  <!-- prometheus -->
+  <rect class="agent" x="380" y="400" width="210" height="96" rx="8"/>
+  <text class="t" x="485" y="424" text-anchor="middle">Prometheus</text>
+  <text class="s" x="485" y="442" text-anchor="middle">recording rules (SLIs per track)</text>
+  <text class="s" x="485" y="458" text-anchor="middle">alerts: loops, failures, SLO burn,</text>
+  <text class="s" x="485" y="474" text-anchor="middle">latency, cost, canary regression</text>
+  <path class="metric" d="M485,332 V398" marker-end="url(#ab)"/>
+  <text class="l" x="493" y="370">scrape /metrics (both tracks)</text>
+  <path class="metric" d="M255,280 V440 H378" marker-end="url(#ab)"/>
+  <text class="l" x="282" y="433">traefik metrics</text>
+
+  <!-- alertmanager -->
+  <rect class="box" x="650" y="400" width="170" height="70" rx="8"/>
+  <text class="t" x="735" y="424" text-anchor="middle">Alertmanager</text>
+  <text class="s" x="735" y="442" text-anchor="middle">critical → page</text>
+  <text class="s" x="735" y="458" text-anchor="middle">warning / info → chat</text>
+  <path class="line" d="M590,436 H648" marker-end="url(#a)"/>
+  <rect class="box" x="870" y="400" width="150" height="70" rx="8"/>
+  <text class="t" x="945" y="424" text-anchor="middle">PagerDuty / Slack</text>
+  <text class="s" x="945" y="442" text-anchor="middle">(alert-sink locally)</text>
+  <path class="line" d="M820,436 H868" marker-end="url(#a)"/>
+
+  <!-- grafana -->
+  <rect class="box" x="380" y="530" width="210" height="64" rx="8"/>
+  <text class="t" x="485" y="555" text-anchor="middle">Grafana</text>
+  <text class="s" x="485" y="573" text-anchor="middle">overview + canary dashboards</text>
+  <path class="metric" d="M485,496 V528" marker-end="url(#ab)"/>
+
+  <!-- controller -->
+  <rect class="ctrl" x="20" y="400" width="215" height="150" rx="8"/>
+  <text class="t" x="127" y="424" text-anchor="middle">Canary controller</text>
+  <text class="s" x="127" y="442" text-anchor="middle">(Argo Rollouts on Kubernetes)</text>
+  <text class="s" x="36" y="466">1. eval gate, 0% traffic</text>
+  <text class="s" x="36" y="484">2. 10 → 25 → 50%, analyse</text>
+  <text class="s" x="36" y="502">3. pass: promote · fail: weight 0</text>
+  <text class="s" x="36" y="520">4. decisions → events.jsonl and</text>
+  <text class="s" x="36" y="536">    Grafana annotations</text>
+  <path class="ctl" d="M200,400 V282" marker-end="url(#ao)"/>
+  <text class="l" x="206" y="345">sets weights</text>
+  <path class="ctl" d="M235,470 H378" marker-end="url(#ao)"/>
+  <text class="l" x="282" y="463">queries SLIs</text>
+  <path class="ctl" d="M235,540 C300,560 330,562 378,562" marker-end="url(#ao)"/>
+  <text class="l" x="262" y="575">annotations</text>
+
+  <!-- legend -->
+  <g transform="translate(650,520)">
+    <path class="line" d="M0,8 H30" marker-end="url(#a)"/><text class="l" x="38" y="12">requests / notifications</text>
+    <path class="trace" d="M0,30 H30" marker-end="url(#ag)"/><text class="l" x="38" y="34">traces (OTLP)</text>
+    <path class="metric" d="M180,8 H210" marker-end="url(#ab)"/><text class="l" x="218" y="12">metrics</text>
+    <path class="ctl" d="M180,30 H210" marker-end="url(#ao)"/><text class="l" x="218" y="34">release control</text>
+  </g>
+</svg>

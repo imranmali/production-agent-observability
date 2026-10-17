@@ -1,0 +1,68 @@
+name: deploy
+
+# Progressive delivery to Kubernetes via Argo Rollouts.
+#   ship:     set the new image -> Argo runs eval gate, 10/25/50% canary with
+#             Prometheus analysis, and aborts (= rolls back) on any failed gate
+#   rollback: revert stable to the previous revision (`kubectl argo rollouts undo`)
+# Requires the `production` environment with a KUBECONFIG secret (base64), and the
+# cluster prerequisites listed in deploy/k8s/kustomization.yaml.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        options: [ship, rollback]
+        default: ship
+      release:
+        description: Image tag to ship (e.g. v1.4.1); ignored for rollback
+        required: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools and cluster access
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG }}
+        run: |
+          test -n "$KUBECONFIG_B64" || { echo "::error::KUBECONFIG secret is not set for the production environment"; exit 1; }
+          mkdir -p ~/.kube && echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config
+          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz" | tar xz
+          curl -sSL -o kubectl-argo-rollouts https://github.com/argoproj/argo-rollouts/releases/download/v1.8.3/kubectl-argo-rollouts-linux-amd64
+          chmod +x kubectl-argo-rollouts && sudo mv kustomize kubectl-argo-rollouts /usr/local/bin/
+
+      - name: Ship release
+        if: inputs.action == 'ship'
+        run: |
+          test -n "${{ inputs.release }}" || { echo "::error::release input is required"; exit 1; }
+          cd deploy/k8s
+          kustomize edit set image support-agent=ghcr.io/${{ github.repository }}:${{ inputs.release }}
+          sed -i "s|app.kubernetes.io/version: .*|app.kubernetes.io/version: ${{ inputs.release }}|" rollout.yaml
+          kustomize build . | kubectl apply -f -
+
+      - name: Watch rollout (fails if Argo aborts it)
+        if: inputs.action == 'ship'
+        run: kubectl argo rollouts status support-agent -n support-agent --watch --timeout 75m
+
+      - name: Report analysis on failure
+        if: failure() && inputs.action == 'ship'
+        run: |
+          kubectl argo rollouts get rollout support-agent -n support-agent || true
+          kubectl get analysisrun -n support-agent --sort-by=.metadata.creationTimestamp -o wide | tail -5 || true
+          echo "::error::Rollout of ${{ inputs.release }} failed its gates and was rolled back to stable."
+
+      - name: Roll back stable to the previous revision
+        if: inputs.action == 'rollback'
+        run: |
+          kubectl argo rollouts undo support-agent -n support-agent
+          kubectl argo rollouts status support-agent -n support-agent --watch --timeout 30m

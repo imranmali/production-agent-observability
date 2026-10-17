@@ -12,7 +12,7 @@ from prometheus_client import Counter, Gauge, Histogram
 BASE = ("release", "track")
 
 # Agent requests take seconds, not milliseconds.
-REQUEST_BUCKETS = (0.25, 0.5, 1, 2, 3, 5, 7.5, 10, 15, 20, 30, 45, 60, 90, 120)
+REQUEST_BUCKETS = (0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 7.5, 10, 12.5, 15, 20, 30, 45, 60, 90, 120)
 LLM_BUCKETS = (0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 30, 60)
 TOOL_BUCKETS = (0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5)
 COST_BUCKETS = (0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1)
