@@ -1,5 +1,7 @@
 # Production Agent with Observability
 
+[![CI](https://github.com/imranmali/production-agent-observability/actions/workflows/ci.yml/badge.svg)](https://github.com/imranmali/production-agent-observability/actions/workflows/ci.yml)
+
 A tool-using Claude support agent shipped like a production service, not a notebook:
 OpenTelemetry tracing to **Arize Phoenix**, **LangSmith** or **Arize AX**; Prometheus
 **latency, cost and token metrics** with Grafana dashboards; **alerts on loops, failures,
@@ -19,13 +21,14 @@ generated from Prometheus, the controller's event log and the notifications Aler
 | # | What was shipped | Gate that decided | Outcome | Time | Customer requests on the bad release |
 |---|---|---|---|---|---|
 | 1 | `v1.4.1` good (effort low, 6 steps) | eval gate 20/20, then 10 → 25 → 50% all checks pass | **promoted** | 7m20s | n/a |
-| 2 | `v1.5.0` bad (prompt v2), eval gate skipped | 10% step: failure ratio 8.34% (limit 2%), loop ratio 8.35% (limit 1%), p95 6.11s vs stable 2.37s, cost/request +75% | **automatic rollback**, traffic off in 1.18s | 2m15s at 10% | ~52 over both attempts (Prometheus counts 72 incl. 20 eval-gate requests); 7 got the loop fallback answer (load generator's count) |
+| 2 | `v1.5.0` bad (prompt v2), eval gate skipped | 10% step: failure ratio 8.34% (limit 2%), loop ratio 8.35% (limit 1%), p95 6.11s vs stable 2.37s, cost/request +75% | **automatic rollback**, controller completed in 1.18s | 2m15s at 10% | ~52 over both attempts (Prometheus counts 72 incl. 20 eval-gate requests); 7 got the loop fallback answer (load generator's count) |
 | 3 | `v1.5.0` again, with the eval gate as first written | gate passed at exactly 95% (one looping case), then a still-firing alert failed it at 10% | **automatic rollback** | 43s at 10% | (in row 2) |
 | 4 | `v1.5.0` again, after the gate fix | eval gate: 95% pass but 1 guardrail trip, now a hard fail | **rejected before traffic** | 31s | 0 |
 | 5 | manual `make rollback` of stable `v1.4.1` → `v1.4.0` | n/a | stable reverted, no failed requests | 36s | n/a |
 
 Stable served 3,061 requests across the drill with **0 failures**, including through the promotion and
 the manual rollback (both swap releases without dropping requests).
+The 1.18s covers the controller's routing config write and cleanup. Traefik reload latency was unmeasured.
 
 ![Canary analysis dashboard during the drill](docs/img/grafana-canary.png)
 
@@ -61,7 +64,7 @@ deploy annotations.*
 | Dashboards | *Agent overview* (SLOs, latency, cost, tokens, cache hit ratio, behaviour, error budget) and *Agent canary analysis* (stable vs canary on every gate), deploy annotations | `scripts/build_dashboards.py` → `deploy/grafana/dashboards/` |
 | Alerting | 13 rules: loop detected / loop rate, step budget, failure rate, multi-window SLO burn, provider errors, target down, p95, spend/hour, unpriced model, canary failure and cost regressions; unit-tested with promtool; stable critical → page, canary and warning/info → chat (routing asserted with amtool) | `deploy/prometheus/rules/alerts.yml`, `deploy/prometheus/tests/`, `deploy/alertmanager/`, [RUNBOOK](docs/RUNBOOK.md) |
 | Canary | Eval gate at 0% traffic (≥95% pass, zero guardrail trips) → 10 → 25 → 50% with analysis vs stable (failure ratio, loop ratio, p95, cost/request, this canary's critical alerts) → promote or roll back | `canary/`, `evals/`, [ADR 0004](docs/adr/0004-canary-gates.md) |
-| Rollback | Automatic on any failed gate (traffic to 0% first); `make rollback` aborts a canary or reverts stable to the previous release with no dropped requests | `canary/controller.py` |
+| Rollback | Failed gates, unavailable metrics, or interrupted local deployments trigger rollback. `make rollback` can also cancel an active canary or revert stable to its previous release | `canary/controller.py` |
 | Kubernetes | Argo Rollouts `Rollout` + `AnalysisTemplate`s (same thresholds, checked by a test), ServiceMonitor, generated PrometheusRule, HPA on in-flight requests, PDB | `deploy/k8s/` |
 | CI/CD | Lint, unit tests, promtool, kustomize + kubeconform (CRDs included), full-stack smoke test; tag → GHCR image; manual deploy workflow (ship / rollback) | `.github/workflows/` |
 
@@ -133,7 +136,7 @@ The *Agent overview* dashboard for the same window: [`docs/img/grafana-overview.
 ## Development
 
 ```bash
-make check       # ruff, pytest (44 tests), promtool rule tests, amtool routing tests
+make check       # ruff, pytest, promtool rule tests, amtool routing tests
 make generated   # rebuild dashboards and the k8s PrometheusRule after changing rules/panels
 ```
 

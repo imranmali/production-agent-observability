@@ -44,7 +44,7 @@ lock: ## Re-pin requirements.lock from pyproject.toml
 state: ## Seed deploy/state (stable = v1.4.0) if missing
 	$(PY) -m canary.controller init --release v1.4.0
 
-build: ## Build the agent image
+build: state ## Build the agent image
 	docker compose build agent-stable
 
 up: state ## Start the whole stack (agent x2, traefik, collector, phoenix, prometheus, alertmanager, grafana)
