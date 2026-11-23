@@ -13,15 +13,22 @@ from agent.llm.base import LLMError
 from agent.tools import tool_specs
 
 
-def client_with(handler) -> AnthropicClient:
-    c = AnthropicClient(Settings(_env_file=None, llm_provider="anthropic", effort="low", llm_max_retries=0))
-    c._client = anthropic.AsyncAnthropic(
-        api_key="test-key",
-        max_retries=0,
-        open_telemetry=False,
-        http_client=anthropic.DefaultAsyncHttpxClient(transport=httpx2.MockTransport(handler)),
-    )
-    return c
+@pytest.fixture
+def client_with(monkeypatch):
+    sdk_client = anthropic.AsyncAnthropic
+
+    def build(handler) -> AnthropicClient:
+        def make_sdk_client(**options):
+            return sdk_client(
+                api_key="test-key",
+                http_client=anthropic.DefaultAsyncHttpxClient(transport=httpx2.MockTransport(handler), trust_env=False),
+                **options,
+            )
+
+        monkeypatch.setattr(anthropic, "AsyncAnthropic", make_sdk_client)
+        return AnthropicClient(Settings(_env_file=None, llm_provider="anthropic", effort="low", llm_max_retries=0))
+
+    return build
 
 
 def message(**overrides):
@@ -47,7 +54,7 @@ def message(**overrides):
     return body
 
 
-async def test_request_shape_and_tool_use_mapping():
+async def test_request_shape_and_tool_use_mapping(client_with):
     seen = {}
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -77,7 +84,7 @@ async def test_request_shape_and_tool_use_mapping():
     assert resp.served_model == "claude-opus-5-5" and not resp.fallback_used
 
 
-async def test_refusal_is_reported_with_category():
+async def test_refusal_is_reported_with_category(client_with):
     def handler(request):
         return httpx2.Response(
             200,
@@ -96,7 +103,7 @@ async def test_refusal_is_reported_with_category():
     ("status", "kind", "retryable"),
     [(429, "rate_limit", True), (529, "server", True), (401, "auth", False), (400, "bad_request", False)],
 )
-async def test_api_errors_map_to_llm_errors(status, kind, retryable):
+async def test_api_errors_map_to_llm_errors(client_with, status, kind, retryable):
     def handler(request):
         return httpx2.Response(status, json={"type": "error", "error": {"type": "x", "message": "boom"}})
 

@@ -128,6 +128,10 @@ make status
 
 What the controller checks at every step is in `canary/policy.yaml`; every decision is appended
 to `deploy/state/events.jsonl` with the numbers it saw, and annotated on the Grafana dashboards.
+If the controller loses Prometheus or the operator interrupts the deployment, it attempts to roll back.
+If cleanup fails or the process is killed, run `make status` and use `make rollback` to retry cleanup
+while a canary is still listed. `routing_config_write_s` records the duration of the weight change
+on disk. `rollback_duration_s` includes container reset and state cleanup.
 
 On Kubernetes: run the **deploy** workflow with `action=ship, release=v1.4.1`. Argo Rollouts
 runs the same gates (`deploy/k8s/analysis-template.yaml`); a failed metric aborts the rollout and

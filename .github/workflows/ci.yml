@@ -51,9 +51,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: make install
-      - run: docker compose build
+      - run: make build
       - run: make up
       - run: ./scripts/smoke.sh
+      - name: Check canary recovery when Prometheus is unavailable
+        run: |
+          if PROMETHEUS_URL=http://127.0.0.1:1 .venv/bin/python -m canary.controller deploy v1.4.1 --skip-evals; then
+            echo 'Canary unexpectedly succeeded without Prometheus' >&2
+            exit 1
+          fi
+          make --silent status | jq -e '.stable == "v1.4.0" and .canary == null and .canary_weight_pct == 0'
+          jq -se 'any(.[]; .event == "step_start" and .weight == 10) and
+            any(.[]; .event == "rollback_done" and .release == "v1.4.1")' deploy/state/events.jsonl
       - name: Logs on failure
         if: failure()
         run: docker compose logs --tail 100

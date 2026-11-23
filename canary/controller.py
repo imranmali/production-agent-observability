@@ -18,14 +18,18 @@ On Kubernetes the same policy runs as an Argo Rollouts AnalysisTemplate
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import httpx
 
@@ -65,13 +69,29 @@ def annotate(text: str, tags: list[str]) -> None:
 # --- state ---------------------------------------------------------------
 
 
+@contextmanager
+def state_lock() -> Iterator[None]:
+    STATE.mkdir(parents=True, exist_ok=True)
+    with (STATE / "controller.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
 def read_state() -> dict[str, Any]:
     path = STATE / "release.json"
     return json.loads(path.read_text()) if path.exists() else {"stable": None, "canary": None, "history": []}
 
 
 def write_state(state: dict[str, Any]) -> None:
-    (STATE / "release.json").write_text(json.dumps(state, indent=2) + "\n")
+    tmp = STATE / "release.tmp"
+    tmp.write_text(json.dumps(state, indent=2) + "\n")
+    tmp.replace(STATE / "release.json")
+
+
+def clear_canary(state: dict[str, Any]) -> None:
+    state["canary"] = None
+    state.pop("attempt_id", None)
+    state.pop("replacing_stable", None)
 
 
 def write_env(track: str, release: str) -> None:
@@ -122,7 +142,9 @@ def write_weights(canary_pct: int) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text("# Written by canary/controller.py - do not edit by hand.\n" + json.dumps(config, indent=2))
     tmp.replace(path)  # atomic, so Traefik never reads a half-written file
-    (STATE / "canary_weight").write_text(str(canary_pct))
+    weight_tmp = STATE / "canary_weight.tmp"
+    weight_tmp.write_text(str(canary_pct))
+    weight_tmp.replace(STATE / "canary_weight")
 
 
 # --- compose helpers ----------------------------------------------------
@@ -143,44 +165,38 @@ def wait_ready(track: str, release: str, timeout_s: float = 90) -> None:
         try:
             r = httpx.get(f"{GATEWAY}/version", headers={"X-Canary": pin}, timeout=3)
             if r.status_code == 200 and r.json().get("release") == release:
-                # Give Traefik's health check time to mark the server up.
-                time.sleep(6)
-                return
+                ready = httpx.get(f"{GATEWAY}/readyz", headers={"X-Canary": pin}, timeout=3)
+                if ready.status_code == 200:
+                    # Give Traefik's health check time to mark the server up.
+                    time.sleep(6)
+                    return
         except httpx.HTTPError:
             pass
         time.sleep(2)
     raise RuntimeError(f"{track} did not become ready with {release} in {timeout_s:.0f}s")
 
 
-def swap_stable(release: str) -> None:
-    """Replace the stable release without dropping requests: park all traffic on the
-    canary container running `release`, recreate stable, then move traffic back."""
-    write_env("canary", release)
-    recreate("agent-canary")
-    wait_ready("canary", release)
-    write_weights(100)
-    time.sleep(3)
-    write_env("stable", release)
-    recreate("agent-stable")
-    wait_ready("stable", release)
-    write_weights(0)
+def replace_track(track: str, release: str) -> None:
+    write_env(track, release)
+    recreate(f"agent-{track}")
+    wait_ready(track, release)
 
 
 # --- commands -----------------------------------------------------------
 
 
 def cmd_init(release: str) -> None:
-    STATE.mkdir(parents=True, exist_ok=True)
-    state = read_state()
-    if state["stable"]:
-        print(f"state exists: stable={state['stable']} (delete deploy/state/ to reset)")
-        if not (STATE / "traefik" / "weights.yml").exists():
-            write_weights(0)
-        return
-    write_env("stable", release)
-    write_env("canary", release)
-    write_weights(0)
-    write_state({"stable": release, "canary": None, "history": [release]})
+    with state_lock():
+        state = read_state()
+        if state["stable"]:
+            print(f"state exists: stable={state['stable']} (delete deploy/state/ to reset)")
+            if not (STATE / "traefik" / "weights.yml").exists():
+                write_weights(0)
+            return
+        write_env("stable", release)
+        write_env("canary", release)
+        write_weights(0)
+        write_state({"stable": release, "canary": None, "history": [release]})
     print(f"initialised: stable={release}")
 
 
@@ -204,28 +220,51 @@ def run_eval_gate(release: str, policy: dict[str, Any]) -> bool:
 
 def cmd_deploy(release: str, skip_evals: bool = False) -> int:
     policy = load_policy()
-    state = read_state()
-    if state["canary"]:
-        sys.exit(f"canary {state['canary']} already in progress; run `rollback` first")
-    stable = state["stable"]
-    if release == stable:
-        sys.exit(f"{release} is already stable")
+    with state_lock():
+        state = read_state()
+        if state["canary"]:
+            sys.exit(f"canary {state['canary']} already in progress; run `rollback` first")
+        stable = state["stable"]
+        if not stable:
+            sys.exit("no stable release; run `make up` first")
+        if release == stable:
+            sys.exit(f"{release} is already stable")
+        write_env("canary", release)
+        attempt_id = uuid4().hex
+        state.update(canary=release, attempt_id=attempt_id)
+        write_state(state)
 
+    try:
+        return run_deployment(release, stable, attempt_id, policy, skip_evals)
+    except (Exception, KeyboardInterrupt) as error:
+        try:
+            with state_lock():
+                if read_state().get("attempt_id") == attempt_id:
+                    do_rollback(release, stable, f"controller error: {type(error).__name__} {error}".strip())
+        except (Exception, KeyboardInterrupt) as rollback_error:
+            print(f"rollback did not complete: {rollback_error}. Run `make rollback` to retry.", file=sys.stderr)
+        raise
+
+
+def run_deployment(release: str, stable: str, attempt_id: str, policy: dict[str, Any], skip_evals: bool) -> int:
     prom = Prometheus(PROM_URL)
     canary_started = datetime.now(UTC)
-    log("canary_start", release=release, stable=stable)
-    annotate(f"canary {release} started (stable {stable})", ["canary", release])
-    write_env("canary", release)
-    recreate("agent-canary")
-    state["canary"] = release
-    write_state(state)
-    wait_ready("canary", release)
+    with state_lock():
+        if read_state().get("attempt_id") != attempt_id:
+            return 1
+        log("canary_start", release=release, stable=stable)
+        annotate(f"canary {release} started (stable {stable})", ["canary", release])
+        recreate("agent-canary")
+        wait_ready("canary", release)
 
     if not skip_evals and not run_eval_gate(release, policy):
-        return do_rollback(release, stable, "eval gate failed")
+        return finish_deployment(release, stable, attempt_id, "eval gate failed")
 
     for weight in policy["steps"]:
-        write_weights(weight)
+        with state_lock():
+            if read_state().get("attempt_id") != attempt_id:
+                return 1
+            write_weights(weight)
         log("step_start", release=release, weight=weight, duration_s=policy["step_duration_s"])
         annotate(f"canary {release} -> {weight}%", ["canary", release])
         extensions = 0
@@ -234,6 +273,8 @@ def cmd_deploy(release: str, skip_evals: bool = False) -> int:
             deadline = time.monotonic() + window
             while time.monotonic() < deadline:
                 time.sleep(5)
+                if read_state().get("attempt_id") != attempt_id:
+                    return 1
                 firing = canary_alerts(prom.firing_alerts(), release, canary_started)
                 if firing and policy["analysis"]["block_on_critical_alerts"]:
                     # don't wait out the step while a page is firing
@@ -255,9 +296,19 @@ def cmd_deploy(release: str, skip_evals: bool = False) -> int:
                 continue
             break
         if verdict.status != "pass":
-            return do_rollback(release, stable, f"step {weight}%: {verdict.reason}")
+            return finish_deployment(release, stable, attempt_id, f"step {weight}%: {verdict.reason}")
 
-    return do_promote(release, stable)
+    return finish_deployment(release, stable, attempt_id)
+
+
+def finish_deployment(release: str, stable: str, attempt_id: str, reason: str | None = None) -> int:
+    with state_lock():
+        if read_state().get("attempt_id") != attempt_id:
+            return 1
+        if reason is not None:
+            do_rollback(release, stable, reason)
+            return 1
+        return do_promote(release, stable)
 
 
 def analyse(
@@ -273,12 +324,13 @@ def do_promote(release: str, previous: str) -> int:
     log("promote_start", release=release, previous=previous)
     write_weights(100)
     time.sleep(3)
-    write_env("stable", release)
-    recreate("agent-stable")
-    wait_ready("stable", release)
-    write_weights(0)
     state = read_state()
-    state.update(stable=release, canary=None)
+    state["replacing_stable"] = True
+    write_state(state)
+    replace_track("stable", release)
+    write_weights(0)
+    clear_canary(state)
+    state["stable"] = release
     state["history"].append(release)
     write_state(state)
     log("promoted", release=release, previous=previous)
@@ -286,42 +338,65 @@ def do_promote(release: str, previous: str) -> int:
     return 0
 
 
-def do_rollback(release: str, stable: str, reason: str) -> int:
+def do_rollback(release: str, stable: str, reason: str) -> None:
     started = time.monotonic()
-    write_weights(0)  # traffic off the canary first; everything else can be slow
-    log("rollback", release=release, stable=stable, reason=reason)
+    state = read_state()
+    # Revoke the deployment before cleanup. If cleanup fails, the original
+    # process must not increase the canary weight again.
+    state.pop("attempt_id", None)
+    write_state(state)
+    if state.get("replacing_stable"):
+        # Promotion may have replaced stable. Keep the ready canary serving
+        # while restoring the previous stable release before switching back.
+        write_weights(100)
+        time.sleep(3)
+        replace_track("stable", stable)
+    routing_started = time.monotonic()
+    write_weights(0)  # remove the canary from weighted routing before resetting it
+    log(
+        "rollback",
+        release=release,
+        stable=stable,
+        reason=reason,
+        routing_config_write_s=round(time.monotonic() - routing_started, 3),
+    )
     annotate(f"ROLLBACK {release}: {reason}", ["rollback", release])
     write_env("canary", stable)
     recreate("agent-canary")
-    state = read_state()
-    state["canary"] = None
+    clear_canary(state)
     write_state(state)
-    log("rollback_done", release=release, traffic_shift_s=round(time.monotonic() - started, 2))
-    return 1
+    log("rollback_done", release=release, rollback_duration_s=round(time.monotonic() - started, 2))
 
 
 def cmd_rollback() -> int:
-    state = read_state()
-    if state["canary"]:
-        return do_rollback(state["canary"], state["stable"], "manual rollback")
-    history = state["history"]
-    if len(history) < 2:
-        sys.exit("no previous stable release to roll back to")
-    current, previous = history[-1], history[-2]
-    log("stable_rollback_start", current=current, target=previous)
-    annotate(f"ROLLBACK stable {current} -> {previous}", ["rollback", current])
-    swap_stable(previous)
-    state.update(stable=previous, canary=None)
-    state["history"] = history[:-1]
-    write_state(state)
-    log("stable_rollback_done", current=previous, reverted=current)
-    return 0
+    with state_lock():
+        state = read_state()
+        if state["canary"]:
+            do_rollback(state["canary"], state["stable"], "manual rollback")
+            return 0
+        history = state["history"]
+        if len(history) < 2:
+            sys.exit("no previous stable release to roll back to")
+        current, previous = history[-1], history[-2]
+        log("stable_rollback_start", current=current, target=previous)
+        annotate(f"ROLLBACK stable {current} -> {previous}", ["rollback", current])
+        replace_track("canary", previous)
+        write_weights(100)
+        time.sleep(3)
+        replace_track("stable", previous)
+        write_weights(0)
+        state["stable"] = previous
+        state["history"] = history[:-1]
+        write_state(state)
+        log("stable_rollback_done", current=previous, reverted=current)
+        return 0
 
 
 def cmd_status() -> int:
     state = read_state()
     weight = (STATE / "canary_weight").read_text() if (STATE / "canary_weight").exists() else "0"
-    print(json.dumps({**state, "canary_weight_pct": int(weight)}, indent=2))
+    status = {name: state[name] for name in ("stable", "canary", "history")}
+    print(json.dumps({**status, "canary_weight_pct": int(weight)}, indent=2))
     return 0
 
 
