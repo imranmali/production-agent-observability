@@ -6,17 +6,13 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 from prometheus_client import REGISTRY
 
 from agent.config import Settings
 from agent.llm.simulated import SimulatedClient
 from agent.runner import Agent
 from agent.telemetry import tracing
-
-EXPORTER = InMemorySpanExporter()
-_provider = TracerProvider()
-_provider.add_span_processor(SimpleSpanProcessor(EXPORTER))
-trace.set_tracer_provider(_provider)
 
 
 def make_agent(**overrides) -> Agent:
@@ -30,11 +26,19 @@ def metric(name: str, **labels) -> float:
 
 
 @pytest.fixture(autouse=True)
-def _clear_spans():
-    EXPORTER.clear()
+def spans(monkeypatch):
+    monkeypatch.delenv("OTEL_SDK_DISABLED", raising=False)
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider(sampler=ALWAYS_ON)
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("support-agent-test")
+    monkeypatch.setattr(tracing, "tracer", lambda: tracer)
+    monkeypatch.setattr(tracing, "_settings", None)
+    yield exporter
+    provider.shutdown()
 
 
-async def test_success_uses_tools_and_records_everything():
+async def test_success_uses_tools_and_records_everything(spans):
     agent = make_agent(release="t-ok")
     before = metric("agent_requests_total", release="t-ok", track="dev", outcome="success")
     r = await agent.run("Can I return order 10231?")
@@ -43,25 +47,25 @@ async def test_success_uses_tools_and_records_everything():
     assert r.steps == 3 and r.cost_usd > 0
     assert metric("agent_requests_total", release="t-ok", track="dev", outcome="success") == before + 1
 
-    spans = {s.name: s for s in EXPORTER.get_finished_spans()}
-    root = spans["agent.run"]
+    by_name = {s.name: s for s in spans.get_finished_spans()}
+    root = by_name["agent.run"]
     assert root.attributes["openinference.span.kind"] == "AGENT"
     assert root.attributes["agent.outcome"] == "success"
-    llm = next(s for s in EXPORTER.get_finished_spans() if s.name == "llm.call")
+    llm = by_name["llm.call"]
     assert llm.attributes["openinference.span.kind"] == "LLM"
     assert llm.attributes["gen_ai.usage.output_tokens"] > 0
     assert llm.parent.span_id == root.context.span_id
-    assert spans["tool.get_order"].attributes["tool.name"] == "get_order"
+    assert by_name["tool.get_order"].attributes["tool.name"] == "get_order"
 
 
-async def test_loop_is_stopped_counted_and_marked_as_error():
+async def test_loop_is_stopped_counted_and_marked_as_error(spans):
     agent = make_agent(release="t-loop", sim_loop_rate=1.0, max_identical_tool_calls=3)
     r = await agent.run("Where is my order 10232?")
     assert r.outcome == "loop_detected"
     assert r.steps == 3  # third identical call is refused before it runs
     assert len(r.tool_calls) == 2
     assert metric("agent_guardrail_trips_total", release="t-loop", track="dev", guardrail="loop_detected") == 1
-    root = next(s for s in EXPORTER.get_finished_spans() if s.name == "agent.run")
+    root = next(s for s in spans.get_finished_spans() if s.name == "agent.run")
     assert root.status.status_code == trace.StatusCode.ERROR
     assert any(e.name == "guardrail.tripped" for e in root.events)
 
@@ -103,9 +107,11 @@ async def test_tool_error_is_returned_to_the_model():
     assert "99999" in r.answer
 
 
-async def test_content_capture_can_be_turned_off():
+async def test_content_capture_can_be_turned_off(spans):
     agent = make_agent(release="t-nocontent", trace_capture_content=False)
     await agent.run("Where is my order 10232?")
-    for span in EXPORTER.get_finished_spans():
+    captured = spans.get_finished_spans()
+    assert captured
+    for span in captured:
         assert "input.value" not in span.attributes
         assert "output.value" not in span.attributes
